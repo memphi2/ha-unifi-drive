@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.8.6 - Local patch development
+
+Local development placeholder for the next `0.8.x` patch release.
+
+- No public release has been published for this version yet.
+- Keep changes in this section limited to low-risk maintenance, compatibility
+  and bug-fix work until the release is prepared.
+
 ## v0.8.5 - LTS and runtime efficiency hardening
 
 Patch release for `v0.8.5`:
