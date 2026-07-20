@@ -6,7 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from .api_errors import CannotConnect, InvalidAuth, UnexpectedResponse
-from .const import DRIVE_STORAGE_PATH, NETWORK_IO_PATH, SYSTEM_PATH
+from .const import DRIVE_DEVICE_INFO_PATH, DRIVE_STORAGE_PATH, NETWORK_IO_PATH, SYSTEM_PATH
 from .security import safe_error_text
 
 _LOGGER = logging.getLogger(__name__)
@@ -61,6 +61,15 @@ class ApiStorageMixin:
         except (CannotConnect, InvalidAuth, UnexpectedResponse) as err:
             _LOGGER.debug(
                 "Could not read UniFi Drive network I/O metadata: %s",
+                safe_error_text(err),
+            )
+        try:
+            data["_device_info"] = await self._request_json(
+                "GET", DRIVE_DEVICE_INFO_PATH
+            )
+        except (CannotConnect, InvalidAuth, UnexpectedResponse) as err:
+            _LOGGER.debug(
+                "Could not read UniFi Drive device-info metadata: %s",
                 safe_error_text(err),
             )
         return data

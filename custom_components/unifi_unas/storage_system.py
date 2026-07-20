@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from ipaddress import ip_address
 from typing import Any
 
@@ -32,6 +33,7 @@ NETWORK_CONTAINER_KEYS = (
     "wans",
     "lans",
     "interfaces",
+    "networkInterfaces",
     "networks",
     "ports",
 )
@@ -66,9 +68,36 @@ def _system_uptime_hours(data: dict[str, Any]) -> float | None:
         return round(uptime_seconds / 3600, 1)
 
     uptime_ms = _first_number(system, ("uptimeMs", "uptime_ms", "uptimeMillis"))
-    if uptime_ms is None:
-        return None
-    return round(uptime_ms / 3_600_000, 1)
+    if uptime_ms is not None:
+        return round(uptime_ms / 3_600_000, 1)
+
+    return _uptime_hours_from_startup(system)
+
+
+def _uptime_hours_from_startup(system: dict[str, Any]) -> float | None:
+    """Return uptime derived from a Drive device-info startup timestamp.
+
+    The Drive ``device-info`` payload has no numeric uptime; it reports an ISO
+    ``startupTime`` instead, which is the only uptime source under API-key auth.
+    """
+    for key in ("startupTime", "startup_time", "startedAt", "bootTime", "boot_time"):
+        raw = system.get(key)
+        if not isinstance(raw, str) or not raw.strip():
+            continue
+        text = raw.strip()
+        if text.endswith("Z"):
+            text = f"{text[:-1]}+00:00"
+        try:
+            started = datetime.fromisoformat(text)
+        except ValueError:
+            continue
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=UTC)
+        seconds = (datetime.now(UTC) - started).total_seconds()
+        if seconds < 0:
+            return None
+        return round(seconds / 3600, 1)
+    return None
 
 
 def _cpu_temperature(data: dict[str, Any]) -> float | None:

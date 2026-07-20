@@ -12,9 +12,29 @@ def normalized_token(value: str) -> str:
 
 
 def system_payload(data: dict[str, Any]) -> dict[str, Any]:
-    """Return the nested UniFi OS system payload."""
+    """Return the merged UniFi OS system metadata payload.
+
+    Two sources feed the system sensors:
+
+    - ``_system`` is the UniFi OS core ``/api/system`` response. It is the
+      richest source, but UniFi API keys cannot read it, so under API-key auth
+      it degrades to a reduced anonymous payload lacking cpu/uptime/versions.
+    - ``_device_info`` is the Drive application ``systems/device-info``
+      response, which IS reachable with an API key and exposes cpu temperature,
+      firmware/app versions, startup time and the network address.
+
+    The Drive payload is used as the base and the core payload overlays it, so
+    the core response keeps precedence when available (username/password auth)
+    while the Drive payload transparently fills the gaps under API-key auth.
+    """
+    if not isinstance(data, dict):
+        return {}
     system = data.get("_system")
-    return system if isinstance(system, dict) else {}
+    system = system if isinstance(system, dict) else {}
+    device_info = data.get("_device_info")
+    if isinstance(device_info, dict) and device_info:
+        return {**device_info, **system}
+    return system
 
 
 def unifi_os_version(data: dict[str, Any]) -> str | None:
@@ -43,7 +63,10 @@ def drive_version(data: dict[str, Any]) -> str | None:
     for key in ("controllers", "apps", "applications"):
         if version := _drive_version_from_items(system.get(key)):
             return version
-    return None
+
+    # The Drive application ``device-info`` payload exposes the controller
+    # version at the top level, which is the only source under API-key auth.
+    return _text(system.get("version"))
 
 
 def _drive_version_from_items(value: Any) -> str | None:

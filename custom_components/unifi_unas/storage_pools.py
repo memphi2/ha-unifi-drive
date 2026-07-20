@@ -504,20 +504,67 @@ def _pool_raid_level(pool: dict[str, Any]) -> str | None:
 
 def _pool_rebuild_progress(pool: dict[str, Any]) -> float | None:
     """Return rebuild/resilver progress in percent for a pool."""
-    return _pool_progress(
+    value = _pool_progress(
         pool,
         primary_keys=("rebuildProgress", "rebuild_percent", "resilverProgress"),
         context_hints=("rebuild", "resilver"),
     )
+    if value is not None:
+        return value
+    # UniFi Drive (UNAS) reports RAID rebuild/resync progress per raid group.
+    return _raid_group_progress(pool)
 
 
 def _pool_sync_progress(pool: dict[str, Any]) -> float | None:
     """Return sync progress in percent for a pool."""
-    return _pool_progress(
+    value = _pool_progress(
         pool,
         primary_keys=("syncProgress", "sync_percent", "initializeProgress"),
         context_hints=("sync", "initialize"),
     )
+    if value is not None:
+        return value
+    # UniFi Drive (UNAS) exposes data-sync progress under ``dataScrubbing``.
+    return _data_scrubbing_progress(pool)
+
+
+def _raid_group_progress(pool: dict[str, Any]) -> float | None:
+    """Return the RAID rebuild/resync progress of a UniFi Drive pool.
+
+    The UNAS payload has no dedicated rebuild field; each data raid group carries
+    a generic ``progress`` (0 while healthy/idle, climbing during a rebuild).
+    """
+    groups = pool.get("raidGroups")
+    if not isinstance(groups, list):
+        return None
+    best: float | None = None
+    for group in groups:
+        if not isinstance(group, dict) or group.get("isSSDCache"):
+            continue
+        normalized = _normalize_percent(group.get("progress"))
+        if normalized is None:
+            continue
+        best = normalized if best is None else max(best, normalized)
+    return best
+
+
+def _data_scrubbing_progress(pool: dict[str, Any]) -> float | None:
+    """Return the data-scrubbing/sync progress of a UniFi Drive pool.
+
+    When idle the ``dataScrubbing`` object reports a status but no progress
+    number, so a running scrub reads its percentage while an idle-but-present
+    scrubber reports 0 rather than an unknown state.
+    """
+    scrub = pool.get("dataScrubbing")
+    if not isinstance(scrub, dict):
+        return None
+    normalized = _normalize_percent(scrub.get("progress"))
+    if normalized is not None:
+        return normalized
+    status = scrub.get("status")
+    if isinstance(status, str) and status.strip():
+        return 0.0
+    return None
 
 
 def _pool_has_problem(pool: dict[str, Any]) -> bool:
