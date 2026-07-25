@@ -1689,6 +1689,49 @@ def test_system_ip_accepts_ipv6_literals() -> None:
     assert sensor_module._system_ip(payload) == "2001:db8::10"
 
 
+def test_cpu_percent_scales_device_info_load_fraction() -> None:
+    """CPU usage should convert the 0-1 device-info load into a percentage."""
+    assert (
+        sensor_module._cpu_percent({"_device_info": {"cpu": {"currentload": 0.156}}})
+        == 15.6
+    )
+    # A value above 1 is assumed to already be a percentage.
+    assert (
+        sensor_module._cpu_percent({"_device_info": {"cpu": {"currentload": 42}}})
+        == 42.0
+    )
+    assert sensor_module._cpu_percent({"_device_info": {"cpu": {}}}) is None
+
+
+def test_memory_percent_derives_used_from_available() -> None:
+    """Memory usage should use the available-memory basis when present."""
+    payload = {
+        "_device_info": {
+            "memory": {"free": 404736, "total": 3970688, "available": 1417728}
+        }
+    }
+
+    assert sensor_module._memory_percent(payload) == 64.3
+
+
+def test_memory_percent_falls_back_to_free_then_used() -> None:
+    """Memory usage should tolerate payloads without an available field."""
+    assert (
+        sensor_module._memory_percent(
+            {"_device_info": {"memory": {"total": 1000, "free": 250}}}
+        )
+        == 75.0
+    )
+    assert (
+        sensor_module._memory_percent(
+            {"_device_info": {"memory": {"total": 1000, "used": 400}}}
+        )
+        == 40.0
+    )
+    assert sensor_module._memory_percent({"_device_info": {"memory": {}}}) is None
+
+
+
 def test_system_ip_falls_back_to_nested_ipv6_interfaces() -> None:
     """Nested network interfaces should expose IPv6 when IPv4 is unavailable."""
     payload = {

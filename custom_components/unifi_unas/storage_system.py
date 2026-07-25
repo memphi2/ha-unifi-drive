@@ -129,6 +129,68 @@ def _cpu_temperature(data: dict[str, Any]) -> float | None:
     return None
 
 
+def _cpu_percent(data: dict[str, Any]) -> float | None:
+    """Return CPU utilization as a percentage.
+
+    The Drive ``device-info`` payload reports ``cpu.currentload`` as a 0-1
+    utilization fraction, which is the only CPU-load source (it is reachable
+    under API-key auth, unlike the UniFi OS ``/api/system`` payload). Values in
+    ``(0, 1]`` are treated as fractions and scaled to a percentage; a value
+    above ``1`` is assumed to already be a percentage.
+    """
+    system = _system_payload(data)
+    cpu = system.get("cpu")
+    if isinstance(cpu, dict):
+        load = _first_number(
+            cpu,
+            ("currentload", "currentLoad", "current_load", "load", "usage", "percent"),
+        )
+        if load is not None:
+            return round(load * 100 if load <= 1 else load, 1)
+
+    load = _first_number(
+        system,
+        ("cpuLoad", "cpu_load", "cpuUsage", "cpu_usage", "cpuPercent", "cpu_percent"),
+    )
+    if load is not None:
+        return round(load * 100 if load <= 1 else load, 1)
+    return None
+
+
+def _memory_percent(data: dict[str, Any]) -> float | None:
+    """Return used memory as a percentage of total memory.
+
+    The Drive ``device-info`` payload exposes ``memory`` as
+    ``{total, free, available}``. Used memory is derived from ``available``
+    (the Linux memory-pressure basis) when present, otherwise from ``free`` or
+    an explicit ``used`` value.
+    """
+    system = _system_payload(data)
+    memory = system.get("memory")
+    if not isinstance(memory, dict):
+        return None
+
+    total = _first_number(memory, ("total", "totalBytes", "total_bytes", "totalKb"))
+    if not total or total <= 0:
+        return None
+
+    available = _first_number(
+        memory, ("available", "availableBytes", "available_bytes")
+    )
+    if available is not None:
+        used = total - available
+    else:
+        free = _first_number(memory, ("free", "freeBytes", "free_bytes"))
+        if free is not None:
+            used = total - free
+        else:
+            used = _first_number(memory, ("used", "usedBytes", "used_bytes"))
+            if used is None:
+                return None
+
+    return round(max(0.0, min(100.0, used / total * 100)), 1)
+
+
 def _system_status(data: dict[str, Any]) -> str | None:
     """Return a user-facing UniFi OS system status."""
     system = _system_payload(data)

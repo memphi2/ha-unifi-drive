@@ -73,7 +73,9 @@ from .storage_pools import (
     _raw_pool_status,
 )
 from .storage_system import (
+    _cpu_percent,
     _cpu_temperature,
+    _memory_percent,
     _system_ip,
     _system_status,
     _system_uptime_hours,
@@ -154,7 +156,9 @@ __all__ = [
     "_pool_sync_progress",
     "_pools",
     "_raw_pool_status",
+    "_cpu_percent",
     "_cpu_temperature",
+    "_memory_percent",
     "_system_ip",
     "_system_status",
     "_system_uptime_hours",

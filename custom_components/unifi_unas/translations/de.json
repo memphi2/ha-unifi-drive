@@ -476,6 +476,12 @@
       "cpu_temperature": {
         "name": "CPU-Temperatur"
       },
+      "cpu_percent": {
+        "name": "CPU-Auslastung"
+      },
+      "memory_percent": {
+        "name": "Speicherauslastung"
+      },
       "system_status": {
         "name": "Systemstatus",
         "state": {

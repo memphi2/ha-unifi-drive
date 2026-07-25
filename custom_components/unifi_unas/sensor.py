@@ -35,6 +35,7 @@ _aggregate_usage = _storage_helpers._aggregate_usage
 _at_risk_disk_count = _storage_helpers._at_risk_disk_count
 _average_disk_temperature = _storage_helpers._average_disk_temperature
 _bytes_to_gib = _storage_helpers._bytes_to_gib
+_cpu_percent = _storage_helpers._cpu_percent
 _cpu_temperature = _storage_helpers._cpu_temperature
 _degraded_pool_count = _storage_helpers._degraded_pool_count
 _drive_health = _storage_helpers._drive_health
@@ -48,6 +49,7 @@ _find_progress_in_tree = _storage_helpers._find_progress_in_tree
 _first_number = _storage_helpers._first_number
 _legacy_drive_index = _storage_helpers._legacy_drive_index
 _maintenance_pool_count = _storage_helpers._maintenance_pool_count
+_memory_percent = _storage_helpers._memory_percent
 _normalize_percent = _storage_helpers._normalize_percent
 _normalized_token = _storage_helpers._normalized_token
 _percentage = _storage_helpers._percentage
@@ -108,6 +110,7 @@ __all__ = [
     "_at_risk_disk_count",
     "_average_disk_temperature",
     "_bytes_to_gib",
+    "_cpu_percent",
     "_cpu_temperature",
     "_degraded_pool_count",
     "_drive_health",
@@ -121,6 +124,7 @@ __all__ = [
     "_first_number",
     "_legacy_drive_index",
     "_maintenance_pool_count",
+    "_memory_percent",
     "_normalize_percent",
     "_normalized_token",
     "_percentage",

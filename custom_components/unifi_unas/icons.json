@@ -57,8 +57,14 @@
       "at_risk_disk_count": {
         "default": "mdi:alert"
       },
+      "cpu_percent": {
+        "default": "mdi:cpu-64-bit"
+      },
       "degraded_pool_count": {
         "default": "mdi:alert"
+      },
+      "memory_percent": {
+        "default": "mdi:memory"
       },
       "drive_power_on_hours": {
         "default": "mdi:clock-outline"
