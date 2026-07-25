@@ -838,6 +838,17 @@ def test_cache_drives_read_top_level_cache_slots() -> None:
     assert sensor_module._cache_drives(None) == []
 
 
+def test_cache_status_reads_pool_cache_block() -> None:
+    """Cache status should normalize the pool's SSD-cache health field."""
+    healthy = {"pools": [{"id": "p1", "cache": {"status": "fullyOperational"}}]}
+    degraded = {"pools": [{"id": "p1", "cache": {"status": "degraded"}}]}
+    assert sensor_module._cache_status(healthy) == "healthy"
+    assert sensor_module._cache_status(degraded) == "degraded"
+    # A pool without an SSD cache reports nothing (sensor stays unavailable).
+    assert sensor_module._cache_status({"pools": [{"id": "p1"}]}) is None
+    assert sensor_module._cache_status({"pools": []}) is None
+
+
 def test_storage_pool_drive_collection_paths() -> None:
     """Pool drive extraction should cover direct, nested and referenced disks."""
     direct_pool = {"drives": [{"serial": "a"}, "bad"]}

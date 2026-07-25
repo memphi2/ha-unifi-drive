@@ -459,6 +459,31 @@ def _aggregate_status(data: dict[str, Any]) -> str | None:
     return known[0]
 
 
+def _cache_status(data: dict[str, Any]) -> str | None:
+    """Return normalized SSD cache health status.
+
+    The RAID1 SSD cache health lives in a pool's ``cache`` block
+    (``cache.status``, e.g. ``fullyOperational``), separate from the pool's own
+    data-array status. Returns None when no pool exposes an SSD cache.
+    """
+    for pool in _pools(data):
+        cache = pool.get("cache")
+        if not isinstance(cache, dict):
+            continue
+        raw_status = _text(cache.get("status"))
+        if raw_status is None:
+            continue
+        normalized = re.sub(r"[^a-z0-9]", "", raw_status.lower())
+        if normalized in HEALTHY_STATUSES:
+            return "healthy"
+        if normalized in DEGRADED_STATUSES:
+            return "degraded"
+        if any(hint in normalized for hint in DISK_PROBLEM_HINTS):
+            return "degraded"
+        return raw_status
+    return None
+
+
 def _degraded_pool_count(data: dict[str, Any]) -> int:
     """Return how many pools are currently degraded."""
     return sum(1 for pool in _pools(data) if _pool_status(pool) == "degraded")

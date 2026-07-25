@@ -37,6 +37,7 @@ _at_risk_disk_count = _storage_helpers._at_risk_disk_count
 _average_disk_temperature = _storage_helpers._average_disk_temperature
 _bytes_to_gib = _storage_helpers._bytes_to_gib
 _cache_drives = _storage_helpers._cache_drives
+_cache_status = _storage_helpers._cache_status
 _cpu_percent = _storage_helpers._cpu_percent
 _cpu_temperature = _storage_helpers._cpu_temperature
 _degraded_pool_count = _storage_helpers._degraded_pool_count
@@ -121,6 +122,7 @@ __all__ = [
     "_average_disk_temperature",
     "_bytes_to_gib",
     "_cache_drives",
+    "_cache_status",
     "_cpu_percent",
     "_cpu_temperature",
     "_degraded_pool_count",

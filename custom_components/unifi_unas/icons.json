@@ -93,6 +93,9 @@
       "maintenance_pool_count": {
         "default": "mdi:wrench"
       },
+      "cache_status": {
+        "default": "mdi:shield-check"
+      },
       "overall_status": {
         "default": "mdi:shield-check"
       },

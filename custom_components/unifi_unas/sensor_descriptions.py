@@ -27,6 +27,7 @@ from .storage_helpers import (
     _at_risk_disk_count,
     _average_disk_temperature,
     _bytes_to_gib,
+    _cache_status,
     _cpu_percent,
     _cpu_temperature,
     _degraded_pool_count,
@@ -225,6 +226,11 @@ AGGREGATE_SENSOR_TYPES: tuple[AggregateSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
         value_fn=lambda data: _memory_percent(data),
+    ),
+    AggregateSensorDescription(
+        key="cache_status",
+        translation_key="cache_status",
+        value_fn=lambda data: _cache_status(data),
     ),
     AggregateSensorDescription(
         key="system_status",

@@ -497,6 +497,13 @@
       "memory_percent": {
         "name": "Memory usage"
       },
+      "cache_status": {
+        "name": "Cache status",
+        "state": {
+          "healthy": "Healthy",
+          "degraded": "Degraded"
+        }
+      },
       "system_status": {
         "name": "System status",
         "state": {
