@@ -92,6 +92,56 @@ DRIVE_POWER_ON_HOUR_KEYS = (
     "hours",
     "lifeHours",
 )
+DRIVE_LIFE_SPAN_KEYS = (
+    "lifeSpan",
+    "life_span",
+    "lifespan",
+    "lifeLeft",
+    "life_left",
+    "lifeRemaining",
+    "life_remaining",
+    "remainingLife",
+    "remaining_life",
+    "percentageLifeLeft",
+)
+DRIVE_MODEL_KEYS = (
+    "model",
+    "modelName",
+    "model_name",
+    "product",
+    "productName",
+)
+DRIVE_CAPACITY_KEYS = (
+    "size",
+    "capacity",
+    "sizeBytes",
+    "size_bytes",
+    "capacityBytes",
+    "capacity_bytes",
+)
+DRIVE_BAD_SECTOR_KEYS = (
+    "badSectorCount",
+    "bad_sector_count",
+    "reallocatedSectorCount",
+    "reallocated_sector_count",
+)
+DRIVE_UNCORRECTABLE_SECTOR_KEYS = (
+    "uncorrectableSectorCount",
+    "uncorrectable_sector_count",
+    "uncorrectableErrors",
+)
+DRIVE_MEDIA_TYPE_KEYS = (
+    "type",
+    "mediaType",
+    "media_type",
+    "media",
+)
+DRIVE_FIRMWARE_KEYS = (
+    "firmware",
+    "firmwareVersion",
+    "firmware_version",
+    "fwVersion",
+)
 DRIVE_HEALTH_KEYS = (
     "health",
     "healthStatus",
@@ -135,15 +185,21 @@ def _legacy_drive_index(drive_key: str) -> int | None:
 
 
 def _drive_name(drive: dict[str, Any], index: int) -> str:
-    """Return display name for a drive."""
+    """Return display name for a drive.
+
+    Falls back to a media-type-aware label ("SSD 1"/"HDD 1") so drives keep
+    unique, suggestive names even when HDDs and SSDs reuse the same slot
+    numbers across separate slot groups.
+    """
     for key in ("name", "label", "displayName", "display_name", "diskName", "disk_name"):
         text = _text(drive.get(key))
         if text:
             return text
     slot = _text(drive.get("slotId")) or _text(drive.get("slot")) or _text(drive.get("bay"))
+    prefix = _drive_media_type(drive) or "Drive"
     if slot:
-        return f"Drive {slot}"
-    return f"Drive {index + 1}"
+        return f"{prefix} {slot}"
+    return f"{prefix} {index + 1}"
 
 
 def _pool_drive_count(pool: dict[str, Any]) -> int | None:
@@ -486,3 +542,98 @@ def _drive_power_on_hours(drive: dict[str, Any]) -> int | None:
     if value is None:
         return None
     return int(round(value))
+
+
+def _drive_life_span(drive: dict[str, Any]) -> int | None:
+    """Return remaining-life percentage for a drive.
+
+    Only SSDs report a ``lifeSpan`` field (0-100, higher is healthier); HDDs
+    omit it entirely, so this returns ``None`` for spinning drives and the
+    sensor stays unavailable for them.
+    """
+    value = _drive_number(drive, DRIVE_LIFE_SPAN_KEYS)
+    if value is None:
+        return None
+    return int(round(max(0.0, min(100.0, value))))
+
+
+def _drive_text(drive: dict[str, Any], keys: tuple[str, ...]) -> str | None:
+    """Return a drive text field from direct or nested detail containers."""
+    for key in keys:
+        if text := _text(drive.get(key)):
+            return text
+    for nested in _dict_values(drive, DRIVE_DETAIL_CONTAINER_KEYS):
+        for key in keys:
+            if text := _text(nested.get(key)):
+                return text
+    return None
+
+
+def _drive_media_type(drive: dict[str, Any]) -> str | None:
+    """Return the drive media type label (e.g. ``SSD``/``HDD``)."""
+    return _drive_text(drive, DRIVE_MEDIA_TYPE_KEYS)
+
+
+def _drive_model(drive: dict[str, Any]) -> str | None:
+    """Return the drive model/product string."""
+    return _drive_text(drive, DRIVE_MODEL_KEYS)
+
+
+def _drive_capacity(drive: dict[str, Any]) -> float | None:
+    """Return the drive capacity in bytes."""
+    return _drive_number(drive, DRIVE_CAPACITY_KEYS)
+
+
+def _drive_bad_sectors(drive: dict[str, Any]) -> int | None:
+    """Return the drive bad/reallocated sector count."""
+    value = _drive_number(drive, DRIVE_BAD_SECTOR_KEYS)
+    if value is None:
+        return None
+    return int(round(value))
+
+
+def _drive_uncorrectable_sectors(drive: dict[str, Any]) -> int | None:
+    """Return the drive uncorrectable-sector count."""
+    value = _drive_number(drive, DRIVE_UNCORRECTABLE_SECTOR_KEYS)
+    if value is None:
+        return None
+    return int(round(value))
+
+
+def _drive_attributes(drive: dict[str, Any]) -> dict[str, Any]:
+    """Return per-drive SMART/identity metadata for entity attributes.
+
+    Covers the fields that are not promoted to their own sensors, so a single
+    drive entity carries the full context (media type, firmware, error rates,
+    hot-spare flags) without one entity per field.
+    """
+    attrs: dict[str, Any] = {}
+    for out_key, in_keys in (
+        ("media_type", DRIVE_MEDIA_TYPE_KEYS),
+        ("firmware", DRIVE_FIRMWARE_KEYS),
+        ("nvme_version", ("nvmeVersion", "nvme_version")),
+        ("state", ("state",)),
+    ):
+        if (value := _drive_text(drive, in_keys)) is not None:
+            attrs[out_key] = value
+
+    for out_key, in_keys in (
+        ("rpm", ("rpm",)),
+        ("read_error_rate", ("readErrorRate", "read_error_rate")),
+        ("smart_read_error_count", ("smartReadErrorCount", "smart_read_error_count")),
+    ):
+        if (value := _drive_number(drive, in_keys)) is not None:
+            attrs[out_key] = int(round(value))
+
+    for out_key, in_key in (
+        ("smart_test_supported", "smartTestSupported"),
+        ("is_global_hot_spare", "isGlobalHotSpare"),
+        ("is_local_hot_spare", "isLocalHotSpare"),
+    ):
+        value = drive.get(in_key)
+        if isinstance(value, bool):
+            attrs[out_key] = value
+
+    return attrs
+
+

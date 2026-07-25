@@ -446,6 +446,21 @@
       "drive_power_on_hours": {
         "name": "Betriebsstunden"
       },
+      "drive_life_span": {
+        "name": "Verbleibende Lebensdauer"
+      },
+      "drive_model": {
+        "name": "Modell"
+      },
+      "drive_capacity": {
+        "name": "Kapazit\u00e4t"
+      },
+      "drive_bad_sectors": {
+        "name": "Fehlerhafte Sektoren"
+      },
+      "drive_uncorrectable_sectors": {
+        "name": "Nicht korrigierbare Sektoren"
+      },
       "snapshot_inventory": {
         "name": "Snapshot-Inventar"
       },

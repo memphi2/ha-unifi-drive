@@ -69,6 +69,21 @@
       "drive_power_on_hours": {
         "default": "mdi:clock-outline"
       },
+      "drive_life_span": {
+        "default": "mdi:heart-pulse"
+      },
+      "drive_model": {
+        "default": "mdi:harddisk"
+      },
+      "drive_capacity": {
+        "default": "mdi:harddisk"
+      },
+      "drive_bad_sectors": {
+        "default": "mdi:alert-circle-outline"
+      },
+      "drive_uncorrectable_sectors": {
+        "default": "mdi:close-octagon-outline"
+      },
       "drive_status": {
         "default": "mdi:check-circle"
       },

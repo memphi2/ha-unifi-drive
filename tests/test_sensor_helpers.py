@@ -751,6 +751,73 @@ def test_storage_drive_helpers_cover_nested_and_fallback_payloads() -> None:
     assert sensor_module._drive_is_at_risk({"status": "good"}) is False
 
 
+def test_drive_life_span_gates_to_ssd_wear_reporting() -> None:
+    """SSD lifeSpan should map to remaining-life percent; HDDs report nothing."""
+    # SSD payload (UNAS reports lifeSpan 0-100, higher is healthier).
+    assert sensor_module._drive_life_span({"type": "SSD", "lifeSpan": 91}) == 91
+    # HDDs omit the field entirely -> sensor stays unavailable.
+    assert sensor_module._drive_life_span({"type": "HDD", "temperature": 41}) is None
+    # Values are clamped into the 0-100 range and rounded to an integer.
+    assert sensor_module._drive_life_span({"lifeSpan": 88.6}) == 89
+    assert sensor_module._drive_life_span({"lifeSpan": 140}) == 100
+    assert sensor_module._drive_life_span({"details": {"remainingLife": 73}}) == 73
+
+
+def test_drive_identity_capacity_and_smart_helpers() -> None:
+    """Model/capacity/SMART helpers should read the UNAS disk payload."""
+    ssd = {
+        "type": "SSD",
+        "model": "Seagate BarraCuda Q5 ZP2000CV30001",
+        "size": 2000398934016,
+        "badSectorCount": 0,
+        "uncorrectableSectorCount": 3,
+    }
+    assert sensor_module._drive_model(ssd) == "Seagate BarraCuda Q5 ZP2000CV30001"
+    assert sensor_module._drive_capacity(ssd) == 2000398934016
+    assert sensor_module._drive_bad_sectors(ssd) == 0
+    assert sensor_module._drive_uncorrectable_sectors(ssd) == 3
+    assert sensor_module._drive_media_type(ssd) == "SSD"
+    # Absent fields degrade to None rather than raising.
+    assert sensor_module._drive_capacity({"type": "HDD"}) is None
+    assert sensor_module._drive_model({}) is None
+
+
+def test_drive_name_is_media_type_aware() -> None:
+    """Drive names should be suggestive so HDD/SSD slot reuse does not collide."""
+    assert sensor_module._drive_name({"type": "SSD", "slotId": "1"}, 0) == "SSD 1"
+    assert sensor_module._drive_name({"type": "HDD", "slotId": "1"}, 0) == "HDD 1"
+    # Falls back to the generic label when the media type is unknown.
+    assert sensor_module._drive_name({"slotId": "2"}, 0) == "Drive 2"
+    # An explicit name always wins.
+    assert sensor_module._drive_name({"type": "SSD", "name": "Cache"}, 0) == "Cache"
+
+
+def test_drive_attributes_expose_smart_and_identity_metadata() -> None:
+    """Per-drive attributes should carry the non-promoted SMART/identity fields."""
+    drive = {
+        "type": "SSD",
+        "firmware": "STGSC014",
+        "nvmeVersion": "1.3",
+        "state": "healthy",
+        "rpm": 0,
+        "readErrorRate": 0,
+        "smartReadErrorCount": 0,
+        "smartTestSupported": False,
+        "isGlobalHotSpare": False,
+        "isLocalHotSpare": True,
+    }
+    attrs = sensor_module._drive_attributes(drive)
+    assert attrs["media_type"] == "SSD"
+    assert attrs["firmware"] == "STGSC014"
+    assert attrs["nvme_version"] == "1.3"
+    assert attrs["rpm"] == 0
+    assert attrs["smart_test_supported"] is False
+    assert attrs["is_local_hot_spare"] is True
+    # Missing fields are simply omitted.
+    assert "read_error_rate" in attrs
+    assert sensor_module._drive_attributes({}) == {}
+
+
 def test_storage_pool_drive_collection_paths() -> None:
     """Pool drive extraction should cover direct, nested and referenced disks."""
     direct_pool = {"drives": [{"serial": "a"}, "bad"]}

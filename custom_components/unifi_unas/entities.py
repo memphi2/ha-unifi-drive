@@ -33,6 +33,7 @@ from .snapshot_inventory import (
     SNAPSHOT_INVENTORY_STATUS_OK,
 )
 from .storage_helpers import (
+    _drive_attributes,
     _drive_key,
     _drive_name,
     _legacy_drive_index,
@@ -288,6 +289,7 @@ class UnifiUnasDriveSensor(UnifiUnasBaseSensor):
             "drive_key": self._drive_key,
             "drive_name": self._drive_name,
             "raw_health": _raw_drive_health(drive),
+            **_drive_attributes(drive),
         }
 
     def _drive(self) -> dict[str, Any] | None:

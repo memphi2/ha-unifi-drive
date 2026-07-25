@@ -38,12 +38,19 @@ _bytes_to_gib = _storage_helpers._bytes_to_gib
 _cpu_percent = _storage_helpers._cpu_percent
 _cpu_temperature = _storage_helpers._cpu_temperature
 _degraded_pool_count = _storage_helpers._degraded_pool_count
+_drive_attributes = _storage_helpers._drive_attributes
+_drive_bad_sectors = _storage_helpers._drive_bad_sectors
+_drive_capacity = _storage_helpers._drive_capacity
 _drive_health = _storage_helpers._drive_health
 _drive_key = _storage_helpers._drive_key
+_drive_life_span = _storage_helpers._drive_life_span
+_drive_media_type = _storage_helpers._drive_media_type
+_drive_model = _storage_helpers._drive_model
 _drive_name = _storage_helpers._drive_name
 _drive_power_on_hours = _storage_helpers._drive_power_on_hours
 _drive_is_at_risk = _storage_helpers._drive_is_at_risk
 _drive_temperature = _storage_helpers._drive_temperature
+_drive_uncorrectable_sectors = _storage_helpers._drive_uncorrectable_sectors
 _drive_version = _storage_helpers._drive_version
 _find_progress_in_tree = _storage_helpers._find_progress_in_tree
 _first_number = _storage_helpers._first_number
@@ -113,12 +120,19 @@ __all__ = [
     "_cpu_percent",
     "_cpu_temperature",
     "_degraded_pool_count",
+    "_drive_attributes",
+    "_drive_bad_sectors",
+    "_drive_capacity",
     "_drive_health",
     "_drive_key",
+    "_drive_life_span",
+    "_drive_media_type",
+    "_drive_model",
     "_drive_name",
     "_drive_power_on_hours",
     "_drive_is_at_risk",
     "_drive_temperature",
+    "_drive_uncorrectable_sectors",
     "_drive_version",
     "_find_progress_in_tree",
     "_first_number",
