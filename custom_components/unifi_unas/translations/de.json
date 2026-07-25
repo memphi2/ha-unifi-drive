@@ -497,6 +497,9 @@
       "memory_percent": {
         "name": "Speicherauslastung"
       },
+      "ssd_wear": {
+        "name": "SSD-Verschlei\u00df"
+      },
       "cache_status": {
         "name": "Cache-Status",
         "state": {

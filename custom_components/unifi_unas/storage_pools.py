@@ -16,7 +16,13 @@ from .storage_common import (
     _slug,
     _text,
 )
-from .storage_drives import _pool_at_risk_drive_count, _pool_drive_temperatures
+from .storage_drives import (
+    _cache_drives,
+    _drive_life_span,
+    _pool_at_risk_drive_count,
+    _pool_drives,
+    _pool_drive_temperatures,
+)
 from .system_metadata import normalized_token as _normalized_token
 
 RAID_LEVEL_KEYS = (
@@ -482,6 +488,29 @@ def _cache_status(data: dict[str, Any]) -> str | None:
             return "degraded"
         return raw_status
     return None
+
+
+def _ssd_wear(data: dict[str, Any]) -> float | None:
+    """Return the average SSD wear percentage across all SSD drives.
+
+    Wear is the complement of each SSD's remaining-life reading
+    (``100 - lifeSpan``); only SSDs report ``lifeSpan`` so HDDs are ignored.
+    Covers both data-pool SSDs and SSD cache slots. Returns None when no SSD
+    exposes a life reading.
+    """
+    life_spans: list[int] = []
+    for pool in _pools(data):
+        for drive in _pool_drives(pool):
+            if (life := _drive_life_span(drive)) is not None:
+                life_spans.append(life)
+    for drive in _cache_drives(data):
+        if (life := _drive_life_span(drive)) is not None:
+            life_spans.append(life)
+
+    if not life_spans:
+        return None
+    wear_values = [100 - life for life in life_spans]
+    return round(sum(wear_values) / len(wear_values), 1)
 
 
 def _degraded_pool_count(data: dict[str, Any]) -> int:

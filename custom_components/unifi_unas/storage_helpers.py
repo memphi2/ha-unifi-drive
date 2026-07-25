@@ -80,6 +80,7 @@ from .storage_pools import (
     _pool_sync_progress,
     _pools,
     _raw_pool_status,
+    _ssd_wear,
 )
 from .storage_system import (
     _cpu_percent,
@@ -174,6 +175,7 @@ __all__ = [
     "_pool_sync_progress",
     "_pools",
     "_raw_pool_status",
+    "_ssd_wear",
     "_cpu_percent",
     "_cpu_temperature",
     "_memory_percent",

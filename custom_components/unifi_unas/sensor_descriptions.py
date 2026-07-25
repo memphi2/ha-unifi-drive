@@ -54,6 +54,7 @@ from .storage_helpers import (
     _pool_usage,
     _pools,
     _read_throughput_mb_s,
+    _ssd_wear,
     _system_ip,
     _system_status,
     _system_uptime_hours,
@@ -231,6 +232,15 @@ AGGREGATE_SENSOR_TYPES: tuple[AggregateSensorDescription, ...] = (
         key="cache_status",
         translation_key="cache_status",
         value_fn=lambda data: _cache_status(data),
+    ),
+    AggregateSensorDescription(
+        key="ssd_wear",
+        translation_key="ssd_wear",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=lambda data: _ssd_wear(data),
     ),
     AggregateSensorDescription(
         key="system_status",

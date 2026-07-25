@@ -849,6 +849,24 @@ def test_cache_status_reads_pool_cache_block() -> None:
     assert sensor_module._cache_status({"pools": []}) is None
 
 
+def test_ssd_wear_averages_complement_of_lifespan() -> None:
+    """SSD wear should be the average of (100 - lifeSpan) across all SSDs."""
+    data = {
+        "pools": [{"id": "p1", "disks": [{"serial": "hdd-1", "type": "HDD"}]}],
+        "cacheSlots": [
+            {"serial": "ssd-1", "type": "SSD", "lifeSpan": 91},
+            {"serial": "ssd-2", "type": "SSD", "lifeSpan": 89},
+        ],
+    }
+    # (100-91 + 100-89) / 2 = (9 + 11) / 2 = 10.0
+    assert sensor_module._ssd_wear(data) == 10.0
+    # Data-pool SSDs are included too, HDDs (no lifeSpan) are ignored.
+    mixed = {"pools": [{"id": "p1", "disks": [{"serial": "s", "lifeSpan": 80}]}]}
+    assert sensor_module._ssd_wear(mixed) == 20.0
+    # No SSDs -> unavailable.
+    assert sensor_module._ssd_wear({"pools": [{"disks": [{"type": "HDD"}]}]}) is None
+
+
 def test_storage_pool_drive_collection_paths() -> None:
     """Pool drive extraction should cover direct, nested and referenced disks."""
     direct_pool = {"drives": [{"serial": "a"}, "bad"]}

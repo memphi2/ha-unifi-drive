@@ -66,6 +66,9 @@
       "memory_percent": {
         "default": "mdi:memory"
       },
+      "ssd_wear": {
+        "default": "mdi:gauge"
+      },
       "drive_power_on_hours": {
         "default": "mdi:clock-outline"
       },

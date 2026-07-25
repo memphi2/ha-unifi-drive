@@ -497,6 +497,9 @@
       "memory_percent": {
         "name": "Memory usage"
       },
+      "ssd_wear": {
+        "name": "SSD wear"
+      },
       "cache_status": {
         "name": "Cache status",
         "state": {

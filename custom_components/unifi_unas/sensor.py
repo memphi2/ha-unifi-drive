@@ -88,6 +88,7 @@ _raw_drive_health = _storage_helpers._raw_drive_health
 _raw_pool_status = _storage_helpers._raw_pool_status
 _read_throughput_mb_s = _storage_helpers._read_throughput_mb_s
 _slug = _storage_helpers._slug
+_ssd_wear = _storage_helpers._ssd_wear
 _sum_known = _storage_helpers._sum_known
 _system_ip = _storage_helpers._system_ip
 _system_payload = _storage_helpers._system_payload
@@ -173,6 +174,7 @@ __all__ = [
     "_raw_pool_status",
     "_read_throughput_mb_s",
     "_slug",
+    "_ssd_wear",
     "_sum_known",
     "_system_ip",
     "_system_payload",
