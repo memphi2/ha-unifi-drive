@@ -75,19 +75,20 @@ def _system_uptime_hours(data: dict[str, Any]) -> float | None:
 
 
 _UPTIME_UNITS: tuple[tuple[str, int], ...] = (
-    ("year", 365 * 24),
-    ("month", 30 * 24),
-    ("day", 24),
-    ("hour", 1),
+    ("y", 365 * 24),
+    ("mo", 30 * 24),
+    ("d", 24),
+    ("h", 1),
 )
 
 
 def _system_uptime_readable(data: dict[str, Any]) -> str | None:
-    """Return uptime as a human-readable string, e.g. ``3 days, 1 hour``.
+    """Return uptime as a compact human-readable string, e.g. ``3d 6h``.
 
     Decomposes the numeric uptime into the three most-significant units down to
-    whole hours (years/months/days/hours); uptimes under an hour fall back to
-    minutes. Months and years use 30- and 365-day approximations.
+    whole hours (``y``/``mo``/``d``/``h``), matching Home Assistant's short
+    duration-unit convention; uptimes under an hour fall back to minutes
+    (``m``). Months and years use 30- and 365-day approximations.
     """
     hours = _system_uptime_hours(data)
     if hours is None:
@@ -96,16 +97,16 @@ def _system_uptime_readable(data: dict[str, Any]) -> str | None:
     whole_hours = int(hours)
     parts: list[str] = []
     remaining = whole_hours
-    for name, size in _UPTIME_UNITS:
+    for label, size in _UPTIME_UNITS:
         if remaining >= size:
             quantity, remaining = divmod(remaining, size)
-            parts.append(f"{quantity} {name}{'s' if quantity != 1 else ''}")
+            parts.append(f"{quantity}{label}")
 
     if not parts:
         minutes = int(round(hours * 60))
-        return f"{minutes} minute{'s' if minutes != 1 else ''}"
+        return f"{minutes}m"
 
-    return ", ".join(parts[:3])
+    return " ".join(parts[:3])
 
 
 

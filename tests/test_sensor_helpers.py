@@ -1784,21 +1784,21 @@ def test_system_metadata_helpers_handle_alternate_network_and_app_shapes() -> No
 
 
 def test_system_uptime_readable_formats_human_duration() -> None:
-    """Readable uptime should break hours into months/days/hours."""
-    # 73.3 h -> 3 days, 1 hour (whole-hour granularity, singular/plural aware).
+    """Readable uptime should break hours into compact d/h units."""
+    # 73.3 h -> 3d 1h (whole-hour granularity, HA short-unit convention).
     assert (
         sensor_module._system_uptime_readable({"_system": {"uptime": 73.3 * 3600}})
-        == "3 days, 1 hour"
+        == "3d 1h"
     )
     # Long uptime shows up to three most-significant units.
     assert (
         sensor_module._system_uptime_readable({"_system": {"uptime": 1500 * 3600}})
-        == "2 months, 2 days, 12 hours"
+        == "2mo 2d 12h"
     )
     # Under an hour falls back to minutes.
     assert (
         sensor_module._system_uptime_readable({"_system": {"uptime": 30 * 60}})
-        == "30 minutes"
+        == "30m"
     )
     # No uptime data -> None (sensor unavailable).
     assert sensor_module._system_uptime_readable({"_system": {}}) is None
