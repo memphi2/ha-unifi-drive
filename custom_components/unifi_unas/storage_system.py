@@ -74,6 +74,41 @@ def _system_uptime_hours(data: dict[str, Any]) -> float | None:
     return _uptime_hours_from_startup(system)
 
 
+_UPTIME_UNITS: tuple[tuple[str, int], ...] = (
+    ("year", 365 * 24),
+    ("month", 30 * 24),
+    ("day", 24),
+    ("hour", 1),
+)
+
+
+def _system_uptime_readable(data: dict[str, Any]) -> str | None:
+    """Return uptime as a human-readable string, e.g. ``3 days, 1 hour``.
+
+    Decomposes the numeric uptime into the three most-significant units down to
+    whole hours (years/months/days/hours); uptimes under an hour fall back to
+    minutes. Months and years use 30- and 365-day approximations.
+    """
+    hours = _system_uptime_hours(data)
+    if hours is None:
+        return None
+
+    whole_hours = int(hours)
+    parts: list[str] = []
+    remaining = whole_hours
+    for name, size in _UPTIME_UNITS:
+        if remaining >= size:
+            quantity, remaining = divmod(remaining, size)
+            parts.append(f"{quantity} {name}{'s' if quantity != 1 else ''}")
+
+    if not parts:
+        minutes = int(round(hours * 60))
+        return f"{minutes} minute{'s' if minutes != 1 else ''}"
+
+    return ", ".join(parts[:3])
+
+
+
 def _uptime_hours_from_startup(system: dict[str, Any]) -> float | None:
     """Return uptime derived from a Drive device-info startup timestamp.
 

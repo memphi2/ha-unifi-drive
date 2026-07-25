@@ -1783,6 +1783,27 @@ def test_system_metadata_helpers_handle_alternate_network_and_app_shapes() -> No
     assert sensor_module._drive_version(payload) == "4.2.0"
 
 
+def test_system_uptime_readable_formats_human_duration() -> None:
+    """Readable uptime should break hours into months/days/hours."""
+    # 73.3 h -> 3 days, 1 hour (whole-hour granularity, singular/plural aware).
+    assert (
+        sensor_module._system_uptime_readable({"_system": {"uptime": 73.3 * 3600}})
+        == "3 days, 1 hour"
+    )
+    # Long uptime shows up to three most-significant units.
+    assert (
+        sensor_module._system_uptime_readable({"_system": {"uptime": 1500 * 3600}})
+        == "2 months, 2 days, 12 hours"
+    )
+    # Under an hour falls back to minutes.
+    assert (
+        sensor_module._system_uptime_readable({"_system": {"uptime": 30 * 60}})
+        == "30 minutes"
+    )
+    # No uptime data -> None (sensor unavailable).
+    assert sensor_module._system_uptime_readable({"_system": {}}) is None
+
+
 def test_cpu_temperature_is_rounded_to_recorded_precision() -> None:
     """CPU temperature states should not churn on insignificant payload jitter."""
     assert (

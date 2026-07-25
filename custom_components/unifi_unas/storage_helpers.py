@@ -89,6 +89,7 @@ from .storage_system import (
     _system_ip,
     _system_status,
     _system_uptime_hours,
+    _system_uptime_readable,
 )
 from .storage_throughput import (
     _parse_throughput_value,
@@ -182,6 +183,7 @@ __all__ = [
     "_system_ip",
     "_system_status",
     "_system_uptime_hours",
+    "_system_uptime_readable",
     "_parse_throughput_value",
     "_read_throughput_mb_s",
     "_throughput_from_disks_mb_s",

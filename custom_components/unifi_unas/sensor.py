@@ -94,6 +94,7 @@ _system_ip = _storage_helpers._system_ip
 _system_payload = _storage_helpers._system_payload
 _system_status = _storage_helpers._system_status
 _system_uptime_hours = _storage_helpers._system_uptime_hours
+_system_uptime_readable = _storage_helpers._system_uptime_readable
 _text = _storage_helpers._text
 _throughput_from_disks_mb_s = _storage_helpers._throughput_from_disks_mb_s
 _throughput_key_hints = _storage_helpers._throughput_key_hints
@@ -180,6 +181,7 @@ __all__ = [
     "_system_payload",
     "_system_status",
     "_system_uptime_hours",
+    "_system_uptime_readable",
     "_text",
     "_throughput_from_disks_mb_s",
     "_throughput_key_hints",

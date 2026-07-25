@@ -138,6 +138,9 @@
       "system_uptime": {
         "default": "mdi:timer-outline"
       },
+      "system_uptime_readable": {
+        "default": "mdi:calendar-clock"
+      },
       "unifi_os_version": {
         "default": "mdi:console"
       },

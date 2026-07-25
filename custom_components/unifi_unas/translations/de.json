@@ -482,6 +482,9 @@
       "system_uptime": {
         "name": "Systemlaufzeit"
       },
+      "system_uptime_readable": {
+        "name": "Laufzeit"
+      },
       "unifi_os_version": {
         "name": "UniFi-OS-Version"
       },

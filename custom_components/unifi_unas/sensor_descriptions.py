@@ -58,6 +58,7 @@ from .storage_helpers import (
     _system_ip,
     _system_status,
     _system_uptime_hours,
+    _system_uptime_readable,
     _unifi_os_version,
     _drive_version,
     _write_throughput_mb_s,
@@ -188,6 +189,12 @@ AGGREGATE_SENSOR_TYPES: tuple[AggregateSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
         value_fn=lambda data: _system_uptime_hours(data),
+    ),
+    AggregateSensorDescription(
+        key="system_uptime_readable",
+        translation_key="system_uptime_readable",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: _system_uptime_readable(data),
     ),
     AggregateSensorDescription(
         key="unifi_os_version",
