@@ -479,9 +479,6 @@
       "system_ip": {
         "name": "System-IP"
       },
-      "system_uptime": {
-        "name": "Systemlaufzeit"
-      },
       "system_uptime_readable": {
         "name": "Laufzeit"
       },
