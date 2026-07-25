@@ -637,3 +637,21 @@ def _drive_attributes(drive: dict[str, Any]) -> dict[str, Any]:
     return attrs
 
 
+def _cache_drives(data: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """Return SSD cache-slot drives from the storage payload.
+
+    Cache disks live in a top-level ``cacheSlots`` list (a sibling of the
+    ``disks`` and ``pools`` lists), not inside any pool's member list, so they
+    are enumerated separately from data-pool drives and would otherwise never
+    surface as entities.
+    """
+    if not isinstance(data, dict):
+        return []
+    for key in ("cacheSlots", "cache_slots", "cacheDisks", "cache_disks", "cacheDrives"):
+        value = data.get(key)
+        if isinstance(value, list):
+            return [item for item in value if isinstance(item, dict)]
+    return []
+
+
+

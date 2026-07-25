@@ -33,6 +33,7 @@ from .snapshot_inventory import (
     SNAPSHOT_INVENTORY_STATUS_OK,
 )
 from .storage_helpers import (
+    _cache_drives,
     _drive_attributes,
     _drive_key,
     _drive_name,
@@ -46,6 +47,9 @@ from .storage_helpers import (
     _raw_drive_health,
     _raw_pool_status,
 )
+
+CACHE_GROUP_KEY = "cache"
+CACHE_GROUP_NAME = "Cache"
 
 
 async def async_setup_entry(
@@ -104,8 +108,44 @@ async def async_setup_entry(
         if new_entities:
             async_add_entities(new_entities)
 
+    known_cache_keys: set[str] = set()
+
+    def _add_missing_cache_drive_sensors() -> None:
+        """Create sensors for SSD cache drives as they appear.
+
+        Cache drives are not members of any data pool, so they are enumerated
+        from the top-level cache-slot list under a dedicated "Cache" group.
+        """
+        new_entities: list[SensorEntity] = []
+        for drive_index, drive in enumerate(_cache_drives(coordinator.data)):
+            drive_key = _drive_key(drive, drive_index)
+            full_drive_key = f"{CACHE_GROUP_KEY}_{drive_key}"
+            if full_drive_key in known_cache_keys:
+                continue
+            known_cache_keys.add(full_drive_key)
+            drive_name = _drive_name(drive, drive_index)
+            new_entities.extend(
+                UnifiUnasCacheDriveSensor(
+                    coordinator,
+                    entry,
+                    description,
+                    CACHE_GROUP_KEY,
+                    full_drive_key,
+                    CACHE_GROUP_NAME,
+                    drive_name,
+                )
+                for description in DRIVE_SENSOR_TYPES
+            )
+
+        if new_entities:
+            async_add_entities(new_entities)
+
     _add_missing_pool_sensors()
     entry.async_on_unload(coordinator.async_add_listener(_add_missing_pool_sensors))
+    _add_missing_cache_drive_sensors()
+    entry.async_on_unload(
+        coordinator.async_add_listener(_add_missing_cache_drive_sensors)
+    )
     async_setup_snapshot_target_entities(
         entry,
         coordinator,
@@ -319,6 +359,23 @@ class UnifiUnasDriveSensor(UnifiUnasBaseSensor):
                 if _normalized_token(_drive_key(drive, drive_index)) == suffix_normalized:
                     return drive
 
+        return None
+
+
+class UnifiUnasCacheDriveSensor(UnifiUnasDriveSensor):
+    """Per-drive sensor for an SSD cache slot.
+
+    Cache drives live outside the data pools, so they resolve against the
+    top-level cache-slot list instead of a pool's member list.
+    """
+
+    def _drive(self) -> dict[str, Any] | None:
+        """Return the currently matching cache drive by key."""
+        drives = _cache_drives(self.coordinator.data)
+        for drive_index, drive in enumerate(drives):
+            candidate_key = f"{self._pool_key}_{_drive_key(drive, drive_index)}"
+            if candidate_key == self._drive_key:
+                return drive
         return None
 
 

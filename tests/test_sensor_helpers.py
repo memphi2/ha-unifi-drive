@@ -818,6 +818,26 @@ def test_drive_attributes_expose_smart_and_identity_metadata() -> None:
     assert sensor_module._drive_attributes({}) == {}
 
 
+def test_cache_drives_read_top_level_cache_slots() -> None:
+    """SSD cache slots live outside pools and must be enumerated separately."""
+    data = {
+        "pools": [{"id": "p1", "disks": [{"serial": "hdd-1"}]}],
+        "disks": [{"serial": "hdd-1", "type": "HDD"}],
+        "cacheSlots": [
+            {"serial": "ssd-1", "type": "SSD", "lifeSpan": 91, "slotId": "1"},
+            {"serial": "ssd-2", "type": "SSD", "lifeSpan": 89, "slotId": "2"},
+            "not-a-dict",
+        ],
+    }
+    cache = sensor_module._cache_drives(data)
+    assert [drive["serial"] for drive in cache] == ["ssd-1", "ssd-2"]
+    # Cache drives carry the SSD wear metric that data-pool HDDs lack.
+    assert sensor_module._drive_life_span(cache[0]) == 91
+    # No cache slots -> empty, and non-dict payloads are tolerated.
+    assert sensor_module._cache_drives({"pools": []}) == []
+    assert sensor_module._cache_drives(None) == []
+
+
 def test_storage_pool_drive_collection_paths() -> None:
     """Pool drive extraction should cover direct, nested and referenced disks."""
     direct_pool = {"drives": [{"serial": "a"}, "bad"]}

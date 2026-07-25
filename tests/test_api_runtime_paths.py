@@ -334,6 +334,7 @@ def test_storage_read_retries_auth_and_keeps_system_metadata() -> None:
         ("GET", "/proxy/drive/api/v2/storage"),
         ("GET", "/api/system"),
         ("GET", NETWORK_IO_PATH),
+        ("GET", "/proxy/drive/api/v2/systems/device-info"),
     ]
 
 
