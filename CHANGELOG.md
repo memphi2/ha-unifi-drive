@@ -1,12 +1,18 @@
 # Changelog
 
-## v0.8.6 - Local patch development
+## v0.8.6 - HA 2026.8 compatibility and issue reporting
 
-Local development placeholder for the next `0.8.x` patch release.
+Patch release for `v0.8.6`:
 
-- No public release has been published for this version yet.
-- Keep changes in this section limited to low-risk maintenance, compatibility
-  and bug-fix work until the release is prepared.
+- Uses Home Assistant's config-entry-scoped device-registry lookup for
+  `2026.8` and later while keeping the legacy fallback for older supported Home
+  Assistant versions.
+- Removes use of the deprecated Home Assistant `PERCENTAGE` unit constant for
+  percentage sensors while keeping sensor units as `%`.
+- Adds structured GitHub issue templates for bug reports, support questions and
+  feature requests.
+- Keeps discovery, diagnostics, snapshot inventory and optional local controls
+  unchanged.
 
 ## v0.8.5 - LTS and runtime efficiency hardening
 

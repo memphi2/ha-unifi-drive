@@ -1,3 +1,8 @@
+[lint]
+# Keep the release lint gate stable across Ruff releases. Broader rule families
+# are enabled deliberately, not implicitly through upstream default changes.
+select = ["E4", "E7", "E9", "F"]
+
 [lint.per-file-ignores]
 # Legacy compatibility modules intentionally re-export imported helper names.
 "custom_components/unifi_unas/api_snapshot.py" = ["F401"]
