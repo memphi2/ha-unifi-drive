@@ -368,6 +368,26 @@ def _async_track_device_registry_metadata_updates(
     return cast(Callable[[], None], coordinator.async_add_listener(_sync_metadata))
 
 
+def _async_get_device_registry_entry(
+    device_registry: dr.DeviceRegistry,
+    entry: UnifiDriveConfigEntry,
+    device_identifier: str,
+) -> dr.DeviceEntry | None:
+    """Return this config entry's device registry entry."""
+    async_get_device_by_identifier = getattr(
+        device_registry,
+        "async_get_device_by_identifier",
+        None,
+    )
+    if async_get_device_by_identifier is not None:
+        return cast(
+            dr.DeviceEntry | None,
+            async_get_device_by_identifier((DOMAIN, device_identifier), entry.entry_id),
+        )
+
+    return device_registry.async_get_device(identifiers={(DOMAIN, device_identifier)})
+
+
 def _async_sync_device_registry_metadata(
     hass: HomeAssistant,
     entry: UnifiDriveConfigEntry,
@@ -376,8 +396,10 @@ def _async_sync_device_registry_metadata(
     """Update device registry metadata that can change after firmware updates."""
     device_identifier = entry.unique_id or entry.entry_id
     device_registry = dr.async_get(hass)
-    device_entry = device_registry.async_get_device(
-        identifiers={(DOMAIN, device_identifier)}
+    device_entry = _async_get_device_registry_entry(
+        device_registry,
+        entry,
+        device_identifier,
     )
     if device_entry is None:
         return False

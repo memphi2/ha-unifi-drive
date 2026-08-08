@@ -64,8 +64,6 @@ def _load_sensor_module():
     sys.modules["homeassistant.config_entries"] = config_entries_pkg
 
     const_pkg = types.ModuleType("homeassistant.const")
-    const_pkg.PERCENTAGE = "%"
-
     class Platform(str, Enum):
         BINARY_SENSOR = "binary_sensor"
         BUTTON = "button"

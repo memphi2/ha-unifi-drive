@@ -12,7 +12,6 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
-    PERCENTAGE,
     EntityCategory,
     UnitOfInformation,
     UnitOfTemperature,
@@ -53,6 +52,8 @@ from .storage_helpers import (
     _drive_version,
     _write_throughput_mb_s,
 )
+
+_PERCENTAGE_UNIT = "%"
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -118,7 +119,7 @@ AGGREGATE_SENSOR_TYPES: tuple[AggregateSensorDescription, ...] = (
     AggregateSensorDescription(
         key="usage_percent",
         translation_key="usage_percent",
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=_PERCENTAGE_UNIT,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
         value_fn=lambda data: _percentage(_aggregate_usage(data), _aggregate_capacity(data)),
@@ -253,7 +254,7 @@ POOL_SENSOR_TYPES: tuple[PoolSensorDescription, ...] = (
         key="pool_usage_percent",
         name="Usage",
         translation_key="pool_usage_percent",
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=_PERCENTAGE_UNIT,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
         entity_registry_enabled_default=False,
@@ -276,7 +277,7 @@ POOL_SENSOR_TYPES: tuple[PoolSensorDescription, ...] = (
         key="pool_rebuild_progress",
         name="Rebuild Progress",
         translation_key="pool_rebuild_progress",
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=_PERCENTAGE_UNIT,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
         entity_registry_enabled_default=False,
@@ -286,7 +287,7 @@ POOL_SENSOR_TYPES: tuple[PoolSensorDescription, ...] = (
         key="pool_sync_progress",
         name="Sync Progress",
         translation_key="pool_sync_progress",
-        native_unit_of_measurement=PERCENTAGE,
+        native_unit_of_measurement=_PERCENTAGE_UNIT,
         state_class=SensorStateClass.MEASUREMENT,
         suggested_display_precision=1,
         entity_registry_enabled_default=False,

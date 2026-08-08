@@ -495,6 +495,43 @@ def test_entry_data_int_uses_default_for_corrupted_values() -> None:
     assert _entry_data_int(entry, "port", 443) == 443
 
 
+def test_device_registry_entry_lookup_prefers_scoped_identifier_api() -> None:
+    """Device metadata sync should use the HA 2026.8 scoped device lookup."""
+    _ensure_repo_custom_components_path()
+
+    from custom_components.unifi_unas import _async_get_device_registry_entry
+    from custom_components.unifi_unas.const import DOMAIN
+
+    device = object()
+    scoped_lookup = Mock(return_value=device)
+    legacy_lookup = Mock()
+    registry = SimpleNamespace(
+        async_get_device_by_identifier=scoped_lookup,
+        async_get_device=legacy_lookup,
+    )
+    entry = SimpleNamespace(entry_id="entry-1")
+
+    assert _async_get_device_registry_entry(registry, entry, "system-id") is device
+    scoped_lookup.assert_called_once_with((DOMAIN, "system-id"), "entry-1")
+    legacy_lookup.assert_not_called()
+
+
+def test_device_registry_entry_lookup_keeps_legacy_fallback() -> None:
+    """Older supported HA versions should keep using the legacy lookup."""
+    _ensure_repo_custom_components_path()
+
+    from custom_components.unifi_unas import _async_get_device_registry_entry
+    from custom_components.unifi_unas.const import DOMAIN
+
+    device = object()
+    legacy_lookup = Mock(return_value=device)
+    registry = SimpleNamespace(async_get_device=legacy_lookup)
+    entry = SimpleNamespace(entry_id="entry-1")
+
+    assert _async_get_device_registry_entry(registry, entry, "system-id") is device
+    legacy_lookup.assert_called_once_with(identifiers={(DOMAIN, "system-id")})
+
+
 def test_device_registry_metadata_sync_updates_firmware_version(hass) -> None:
     """Coordinator refreshes should keep HA device firmware metadata current."""
     _ensure_repo_custom_components_path()
