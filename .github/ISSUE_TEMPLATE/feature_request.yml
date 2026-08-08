@@ -1,0 +1,95 @@
+name: Feature request
+description: Suggest a new integration capability, entity, option or documentation improvement.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion. Please describe the workflow and expected behavior, not only the implementation idea.
+
+        Optional local controls depend on undocumented local UniFi Drive / UniFi OS endpoints and may vary by firmware and permissions.
+
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Use case
+      description: What are you trying to achieve?
+      placeholder: I want Home Assistant to...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: workflow
+    attributes:
+      label: Related workflow
+      multiple: true
+      options:
+        - Discovery / setup
+        - Core monitoring sensors
+        - Storage pools / drives
+        - Throughput
+        - Diagnostics
+        - Repairs
+        - Snapshot inventory
+        - Snapshot controls
+        - Fan controls
+        - Backup controls
+        - Update controls
+        - Wake-on-LAN / power controls
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_behavior
+    attributes:
+      label: Proposed behavior
+      description: What should the integration do?
+      placeholder: When ..., the integration should ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: default_or_optional
+    attributes:
+      label: Should this be default behavior or optional?
+      options:
+        - Optional
+        - Default behavior
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: local_write
+    attributes:
+      label: Would this require writing to the UNAS?
+      description: Writes include changing snapshot settings, fan mode, backup tasks, update actions, reboot or shutdown.
+      options:
+        - "No"
+        - "Yes"
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: device_scope
+    attributes:
+      label: Device and firmware scope
+      description: Mention the tested or expected model and firmware versions, if known.
+      placeholder: "UNAS4, UniFi OS 5.1.19, Drive 4.3.6"
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workaround do you use today, if any?
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context
+      description: Screenshots, links, examples or related issues.

@@ -1,0 +1,117 @@
+name: Setup or support question
+description: Ask for help with installation, configuration, discovery or optional controls.
+title: "[Support]: "
+labels:
+  - question
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form when you are stuck during setup or configuration and do not yet have a confirmed bug.
+
+        Do not paste tokens, passwords, private IP addresses, MAC addresses, serial numbers, cookies, screenshots with private data, or raw API payloads.
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: What are you trying to do?
+      description: Describe the setup, option or action you are trying to complete.
+      placeholder: I am trying to add my UNAS through discovery...
+    validations:
+      required: true
+
+  - type: textarea
+    id: stuck
+    attributes:
+      label: Where are you stuck?
+      description: Include the exact screen, step, repair issue, error message or entity behavior.
+      placeholder: The config flow shows...
+    validations:
+      required: true
+
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration version
+      placeholder: "0.8.5"
+    validations:
+      required: true
+
+  - type: input
+    id: home_assistant_version
+    attributes:
+      label: Home Assistant version
+      placeholder: "2026.8.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install_method
+    attributes:
+      label: Installation method
+      options:
+        - HACS
+        - Manual custom_components copy
+        - Development checkout
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: device_model
+    attributes:
+      label: UNAS model
+      options:
+        - UNAS2
+        - UNAS4
+        - UNAS Pro
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: input
+    id: firmware_versions
+    attributes:
+      label: UniFi OS and Drive versions
+      description: Use the versions shown in the UniFi UI, or enter unknown.
+      placeholder: "UniFi OS 5.1.19, Drive 4.3.6"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: auth_method
+    attributes:
+      label: Authentication method
+      options:
+        - Username and password
+        - API key
+        - Not sure
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Setup checks
+      options:
+        - label: I read the README and troubleshooting guide.
+          required: true
+        - label: I restarted Home Assistant after installing or updating.
+          required: true
+        - label: I searched existing issues and release notes.
+          required: true
+        - label: I redacted credentials, tokens, IP addresses, MAC addresses and serial numbers from all pasted text.
+          required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics or logs
+      description: Attach diagnostics if possible, or paste only the relevant log excerpt with private data redacted.
+      render: text
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context
+      description: Network setup, VLANs, discovery behavior, pool state, optional features enabled, or anything else that helps.

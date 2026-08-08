@@ -1,0 +1,193 @@
+name: Bug report
+description: Report a reproducible problem with the UniFi Drive / UNAS integration.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Please fill in the fields below so the issue can be analyzed without repeated back-and-forth.
+
+        Do not paste tokens, passwords, private IP addresses, MAC addresses, serial numbers, cookies, screenshots with private data, or raw API payloads.
+
+  - type: dropdown
+    id: affected_area
+    attributes:
+      label: Affected area
+      description: Select every area that is affected.
+      multiple: true
+      options:
+        - Install / update
+        - Discovery / config flow
+        - Reauth / reconfigure
+        - Core monitoring sensors
+        - Storage pools / drives
+        - Throughput sensors
+        - Diagnostics
+        - Repairs
+        - Optional snapshot controls
+        - Optional fan controls
+        - Optional backup controls
+        - Optional update controls
+        - Wake-on-LAN / power controls
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration version
+      description: "Example: 0.8.5"
+      placeholder: "0.8.5"
+    validations:
+      required: true
+
+  - type: input
+    id: home_assistant_version
+    attributes:
+      label: Home Assistant version
+      description: "Example: 2026.8.1"
+      placeholder: "2026.8.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install_method
+    attributes:
+      label: Installation method
+      options:
+        - HACS
+        - Manual custom_components copy
+        - Development checkout
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: device_model
+    attributes:
+      label: UNAS model
+      options:
+        - UNAS2
+        - UNAS4
+        - UNAS Pro
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: input
+    id: unifi_os_version
+    attributes:
+      label: UniFi OS version
+      description: Use the version shown in the UniFi UI.
+      placeholder: "5.1.19"
+    validations:
+      required: true
+
+  - type: input
+    id: drive_version
+    attributes:
+      label: UniFi Drive app version
+      description: Use the version shown in the UniFi UI, or enter unknown.
+      placeholder: "4.3.6"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: auth_method
+    attributes:
+      label: Authentication method
+      options:
+        - Username and password
+        - API key
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: account_role
+    attributes:
+      label: UniFi account role / permissions
+      description: Do not include the username. Enter the role or permission level only.
+      placeholder: "Owner / Administrator / limited local user / unknown"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: prechecks
+    attributes:
+      label: Pre-checks
+      description: Please complete these before submitting.
+      options:
+        - label: I restarted Home Assistant after installing or updating the integration.
+          required: true
+        - label: I searched existing issues and release notes.
+          required: true
+        - label: I attached Home Assistant diagnostics for this integration, or explained why diagnostics are not available.
+          required: true
+        - label: I redacted credentials, tokens, IP addresses, MAC addresses and serial numbers from all pasted text.
+          required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should happen?
+      placeholder: The UniFi OS version sensor should show the version displayed in the UniFi UI...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happens instead?
+      placeholder: The sensor remains unknown...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include the exact Home Assistant screen, service, entity or option path used.
+      placeholder: |
+        1. Open Settings -> Devices & services -> ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: affected_entities
+    attributes:
+      label: Affected entities
+      description: List entity names or entity IDs. Do not include private hostnames, IPs, MAC addresses or serials.
+      placeholder: |
+        sensor.unifi_drive_unifi_os_version
+        sensor.unifi_drive_drive_version
+        sensor.unifi_drive_cpu_temperature
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Attach the Home Assistant diagnostics file for this integration if possible. Do not paste raw API payloads.
+      placeholder: Drag and drop the diagnostics file here, or explain why it is not available.
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste only the relevant Home Assistant log excerpt. Redact credentials and local identifiers.
+      render: text
+      placeholder: |
+        Logger: custom_components.unifi_unas...
+
+  - type: textarea
+    id: additional_context
+    attributes:
+      label: Additional context
+      description: Firmware update timing, pool rebuild/sync state, network setup, screenshots with private data redacted, or anything else that helps.

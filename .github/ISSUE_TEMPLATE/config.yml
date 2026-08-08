@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: README
+    url: https://github.com/memphi2/ha-unifi-drive/blob/main/README.md
+    about: Start here for features, installation, options, diagnostics and removal.
+  - name: Troubleshooting
+    url: https://github.com/memphi2/ha-unifi-drive/blob/main/docs/troubleshooting.md
+    about: Check this first for setup, discovery, sensor and optional-control problems.
+  - name: Known limitations
+    url: https://github.com/memphi2/ha-unifi-drive/blob/main/docs/known_limitations.md
+    about: Review firmware, permission and endpoint limitations before filing a bug.
+  - name: Releases and update notes
+    url: https://github.com/memphi2/ha-unifi-drive/releases
+    about: Review current release notes, update instructions and migration notes.
