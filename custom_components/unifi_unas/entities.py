@@ -70,16 +70,17 @@ async def async_setup_entry(
         new_entities: list[SensorEntity] = []
         for index, pool in enumerate(_pools(coordinator.data)):
             pool_key = _pool_key(pool, index)
-            if pool_key in known_pool_keys:
-                continue
-            known_pool_keys.add(pool_key)
             pool_name = _pool_name(pool, index)
-            new_entities.extend(
-                UnifiUnasPoolSensor(
-                    coordinator, entry, description, pool_key, pool_name
+
+            if pool_key not in known_pool_keys:
+                known_pool_keys.add(pool_key)
+                new_entities.extend(
+                    UnifiUnasPoolSensor(
+                        coordinator, entry, description, pool_key, pool_name
+                    )
+                    for description in POOL_SENSOR_TYPES
                 )
-                for description in POOL_SENSOR_TYPES
-            )
+
             for drive_index, drive in enumerate(_pool_drives(pool)):
                 drive_key = _drive_key(drive, drive_index)
                 full_drive_key = f"{pool_key}_{drive_key}"

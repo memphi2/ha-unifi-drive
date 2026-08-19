@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.8.7 - Dynamic drive entity discovery
+
+Bug fix release for `v0.8.7`:
+
+- Adds missing dynamic entity creation for drives added to an already known
+  storage pool after initial setup.
+- Fixes the case where a RAID expansion updates pool drive count, but the new
+  drive's Status, Temperature and Power-On Hours entities are not created after
+  reload or reconfigure.
+- Keeps existing pool entities stable and only adds the missing drive entities
+  when the coordinator sees new drive data.
+
 ## v0.8.6 - HA 2026.8 compatibility and issue reporting
 
 Patch release for `v0.8.6`:

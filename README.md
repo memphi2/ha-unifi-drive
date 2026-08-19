@@ -32,7 +32,7 @@ Home Assistant installations.
 
 ## Current Release
 
-- Current release line: `v0.8.6`
+- Current release line: `v0.8.7`
 - Home Assistant setup: UI config flow, discovery, manual setup, reauth,
   reconfigure and options flow
 - HACS type: custom integration

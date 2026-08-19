@@ -523,6 +523,73 @@ def test_pool_and_drive_sensor_properties_follow_current_payload() -> None:
     assert drive_sensor.extra_state_attributes is None
 
 
+def test_sensor_setup_adds_new_drive_entities_for_existing_pool() -> None:
+    """Coordinator refreshes should add drive entities added after setup."""
+    listeners = []
+    unload_callbacks = []
+    pool = {
+        "id": "pool-a",
+        "name": "Primary",
+        "drives": [
+            {"serial": "disk-a", "status": "healthy", "temperature": 31},
+        ],
+    }
+    coordinator = _FakeUpdateCoordinator({"pools": [pool]})
+    coordinator.snapshot_settings = []
+
+    def _add_listener(listener):
+        listeners.append(listener)
+        return lambda: None
+
+    coordinator.async_add_listener = _add_listener
+    entry = types.SimpleNamespace(
+        entry_id="entry-1",
+        unique_id="device-1",
+        title="UNAS",
+        data={"snapshot_buttons_enabled": False},
+        runtime_data=coordinator,
+        async_on_unload=unload_callbacks.append,
+    )
+    batches = []
+
+    def _add_entities(entities):
+        batches.append(list(entities))
+
+    asyncio.run(sensor_module.async_setup_entry(None, entry, _add_entities))
+
+    initial_unique_ids = {
+        getattr(entity, "_attr_unique_id", None)
+        for batch in batches
+        for entity in batch
+    }
+    assert any("_pool_a_disk_a_drive_status" in uid for uid in initial_unique_ids)
+    assert not any("_pool_a_disk_b_drive_status" in uid for uid in initial_unique_ids)
+
+    coordinator.data = {
+        "pools": [
+            {
+                "id": "pool-a",
+                "name": "Primary",
+                "drives": [
+                    {"serial": "disk-a", "status": "healthy", "temperature": 31},
+                    {"serial": "disk-b", "status": "healthy", "temperature": 34},
+                ],
+            }
+        ]
+    }
+    listeners[0]()
+
+    added_unique_ids = {
+        getattr(entity, "_attr_unique_id", None)
+        for entity in batches[-1]
+    }
+    assert {
+        f"device-1_pool_a_disk_b_{description.key}"
+        for description in sensor_module.DRIVE_SENSOR_TYPES
+    } <= added_unique_ids
+    assert not any("_pool_a_pool_status" in uid for uid in added_unique_ids)
+
+
 def test_binary_sensor_properties_cover_aggregate_and_dynamic_pools() -> None:
     """Binary sensors should expose problem metadata and clear stale pools."""
     pool = {
