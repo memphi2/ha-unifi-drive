@@ -63,6 +63,44 @@ DRIVE_POOL_KEYS = (
     "activeRaidGroupId",
     "active_raid_group_id",
 )
+DRIVE_NON_POOL_BOOL_KEYS = (
+    "empty",
+    "hotSpare",
+    "hot_spare",
+    "isEmpty",
+    "isHotSpare",
+    "isSpare",
+    "isUnassigned",
+    "spare",
+    "unassigned",
+)
+DRIVE_NON_POOL_HINTS = (
+    "available",
+    "empty",
+    "free",
+    "hotspare",
+    "notinstalled",
+    "notpresent",
+    "spare",
+    "unallocated",
+    "unassigned",
+    "unused",
+)
+DRIVE_STATUS_HINT_KEYS = (
+    "allocation",
+    "condition",
+    "health",
+    "healthStatus",
+    "memberState",
+    "mode",
+    "role",
+    "slotStatus",
+    "smartStatus",
+    "state",
+    "status",
+    "type",
+    "usage",
+)
 POOL_DRIVE_COUNT_KEYS = (
     "driveCount",
     "diskCount",
@@ -212,13 +250,15 @@ def _complete_single_pool_global_drives(
     pool: dict[str, Any], drives: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
     """Prefer complete single-pool global disk data when local drive lists lag."""
-    global_drives = _collect_single_pool_global_drives(pool)
+    global_drives = _collect_single_pool_global_drives(pool, known_drives=drives)
     if len(global_drives) > len(drives):
         return global_drives
     return drives
 
 
-def _collect_single_pool_global_drives(pool: dict[str, Any]) -> list[dict[str, Any]]:
+def _collect_single_pool_global_drives(
+    pool: dict[str, Any], *, known_drives: list[dict[str, Any]] | None = None
+) -> list[dict[str, Any]]:
     """Collect global disks when a single-pool payload declares them as members."""
     pool_count = pool.get("__pool_count")
     if pool_count != 1:
@@ -233,9 +273,109 @@ def _collect_single_pool_global_drives(pool: dict[str, Any]) -> list[dict[str, A
         return []
 
     drives = [disk for disk in global_disks if isinstance(disk, dict)]
-    if len(drives) != expected_count:
+    pool_drives = _global_pool_member_drives(
+        pool, drives, expected_count, known_drives or []
+    )
+    if len(pool_drives) != expected_count:
         return []
-    return drives
+    return pool_drives
+
+
+def _global_pool_member_drives(
+    pool: dict[str, Any],
+    drives: list[dict[str, Any]],
+    expected_count: int,
+    known_drives: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return global drives that can be safely treated as pool members."""
+    pool_references = _pool_reference_values(pool)
+    known_identity_values = _drive_identity_values_from_drives(known_drives)
+    members: list[dict[str, Any]] = []
+    candidates: list[dict[str, Any]] = []
+
+    for drive in drives:
+        if _drive_matches_identity_values(drive, known_identity_values):
+            _append_unique_drive(members, drive)
+            continue
+        if pool_references and any(
+            _drive_pool_reference_matches(drive, pool_reference)
+            for pool_reference in pool_references
+        ):
+            _append_unique_drive(members, drive)
+            continue
+        if not _drive_looks_non_pool_member(drive):
+            _append_unique_drive(candidates, drive)
+
+    if len(members) > expected_count:
+        return []
+
+    missing = expected_count - len(members)
+    if missing > 0 and len(candidates) == missing:
+        for candidate in candidates:
+            _append_unique_drive(members, candidate)
+
+    return members
+
+
+def _append_unique_drive(drives: list[dict[str, Any]], drive: dict[str, Any]) -> None:
+    """Append a drive if its known identity is not already present."""
+    drive_values = _drive_identity_values(drive)
+    if any(drive_values and drive_values & _drive_identity_values(item) for item in drives):
+        return
+    drives.append(drive)
+
+
+def _drive_identity_values_from_drives(drives: list[dict[str, Any]]) -> set[str]:
+    """Return normalized identity values from drive-like dictionaries."""
+    values: set[str] = set()
+    for drive in drives:
+        values.update(_drive_identity_values(drive))
+    return values
+
+
+def _drive_matches_identity_values(
+    drive: dict[str, Any], identity_values: set[str]
+) -> bool:
+    """Return whether a drive matches any known identity value."""
+    return bool(identity_values and _drive_identity_values(drive) & identity_values)
+
+
+def _drive_identity_values(drive: dict[str, Any]) -> set[str]:
+    """Return stable identity values for drive reconciliation."""
+    values: set[str] = set()
+    for key in (
+        "id",
+        "uuid",
+        "guid",
+        "serial",
+        "wwn",
+        "diskName",
+        "disk_name",
+        "name",
+        "slotId",
+        "slot",
+        "bay",
+    ):
+        value = _text(drive.get(key))
+        if value:
+            values.add(_normalized_token(value))
+    return values
+
+
+def _drive_looks_non_pool_member(drive: dict[str, Any]) -> bool:
+    """Return whether a global disk looks like a spare or unassigned device."""
+    for key in DRIVE_NON_POOL_BOOL_KEYS:
+        if drive.get(key) is True:
+            return True
+
+    for key in DRIVE_STATUS_HINT_KEYS:
+        value = _text(drive.get(key))
+        if not value:
+            continue
+        normalized = _normalized_token(value)
+        if any(hint in normalized for hint in DRIVE_NON_POOL_HINTS):
+            return True
+    return False
 
 
 def _collect_direct_pool_drives(pool: dict[str, Any]) -> list[dict[str, Any]]:

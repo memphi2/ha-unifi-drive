@@ -967,6 +967,79 @@ def test_storage_drive_extraction_uses_single_pool_global_disk_count() -> None:
     assert sensor_module._drive_power_on_hours(drives[5]) == 1006
 
 
+def test_storage_drive_extraction_filters_single_pool_global_spares() -> None:
+    """Single-pool global fallback should ignore spare or unassigned disks."""
+    payload = {
+        "pools": [
+            {
+                "id": "pool-a",
+                "label": "Primary",
+                "driveCount": 6,
+                "drives": [
+                    {
+                        "serial": f"disk-{index}",
+                        "temperature": 30 + index,
+                    }
+                    for index in range(1, 6)
+                ],
+            }
+        ],
+        "disks": [
+            {
+                "serial": f"disk-{index}",
+                "temperature": 30 + index,
+                "powerOnHours": 1000 + index,
+                "healthScore": 5,
+            }
+            for index in range(1, 7)
+        ]
+        + [
+            {
+                "serial": "spare-1",
+                "role": "hot_spare",
+                "temperature": 28,
+                "healthScore": 5,
+            }
+        ],
+    }
+
+    pools = sensor_module._pools(payload)
+    drives = sensor_module._pool_drives(pools[0])
+
+    assert len(drives) == 6
+    assert sensor_module._drive_key(drives[5], 5) == "disk_6"
+    assert {sensor_module._drive_key(drive, index) for index, drive in enumerate(drives)} == {
+        "disk_1",
+        "disk_2",
+        "disk_3",
+        "disk_4",
+        "disk_5",
+        "disk_6",
+    }
+
+
+def test_storage_drive_extraction_does_not_guess_ambiguous_single_pool_extras() -> None:
+    """Single-pool fallback should not guess when extra global disks are ambiguous."""
+    payload = {
+        "pools": [
+            {
+                "id": "pool-a",
+                "label": "Primary",
+                "driveCount": 6,
+            }
+        ],
+        "disks": [
+            {"serial": f"disk-{index}", "temperature": 30 + index}
+            for index in range(1, 8)
+        ],
+    }
+
+    pools = sensor_module._pools(payload)
+
+    assert sensor_module._pool_drives(pools[0]) == []
+    assert sensor_module._pool_drive_count(pools[0]) == 6
+
+
 def test_storage_drive_extraction_does_not_guess_global_disks_for_multiple_pools() -> None:
     """Unreferenced global disks should not be assigned across multiple pools."""
     payload = {
