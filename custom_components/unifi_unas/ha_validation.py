@@ -7,7 +7,7 @@ from importlib import import_module
 from types import ModuleType
 from typing import Any
 
-PROBATIO_HOMEASSISTANT_VERSION = (2026, 9)
+PROBATIO_HOMEASSISTANT_VERSION = (2026, 10)
 
 
 def _load_validation_module() -> ModuleType:

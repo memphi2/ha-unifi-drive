@@ -80,7 +80,7 @@ def test_validation_compat_falls_back_to_probatio(
 def test_validation_compat_uses_probatio_for_new_homeassistant(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Home Assistant 2026.9+ should use Probatio even if voluptuous exists."""
+    """Home Assistant 2026.10+ should use Probatio even if voluptuous exists."""
     ha_const = types.ModuleType("homeassistant.const")
     ha_const.__version__ = "2026.10.0"
     probatio = _stub_validation_module()
@@ -100,6 +100,28 @@ def test_validation_compat_uses_probatio_for_new_homeassistant(
     module = _load_validation_module("ha_validation_new_ha_for_tests")
 
     assert module.Schema is probatio.Schema
+
+
+def test_validation_compat_keeps_voluptuous_for_homeassistant_2026_9(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Home Assistant 2026.9 should keep voluptuous schemas."""
+    ha_const = types.ModuleType("homeassistant.const")
+    ha_const.__version__ = "2026.9.0"
+    voluptuous = _stub_validation_module()
+
+    def import_module(name: str) -> types.ModuleType:
+        if name == "homeassistant.const":
+            return ha_const
+        if name == "voluptuous":
+            return voluptuous
+        raise AssertionError(f"unexpected import: {name}")
+
+    monkeypatch.setattr(importlib, "import_module", import_module)
+
+    module = _load_validation_module("ha_validation_2026_9_for_tests")
+
+    assert module.Schema is voluptuous.Schema
 
 
 def test_validation_compat_keeps_voluptuous_for_old_homeassistant(
