@@ -309,6 +309,8 @@ def _global_pool_member_drives(
     for drive in drives:
         if _drive_looks_non_pool_member(drive):
             continue
+        if _drive_references_foreign_pool(drive, pool_references):
+            continue
         if known_drive := _matching_known_drive(drive, known_drives):
             _append_unique_drive(members, _merge_drive_entries(drive, known_drive))
             continue
@@ -331,6 +333,18 @@ def _global_pool_member_drives(
             _append_unique_drive(members, candidate)
 
     return members
+
+
+def _drive_references_foreign_pool(
+    drive: dict[str, Any], pool_references: list[str]
+) -> bool:
+    """Return whether a drive explicitly references a different pool."""
+    if not _drive_has_explicit_pool_reference(drive):
+        return False
+    return not any(
+        _drive_pool_reference_matches(drive, pool_reference)
+        for pool_reference in pool_references
+    )
 
 
 def _append_unique_drive(drives: list[dict[str, Any]], drive: dict[str, Any]) -> None:

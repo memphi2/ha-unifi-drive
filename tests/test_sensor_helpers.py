@@ -1143,6 +1143,70 @@ def test_storage_drive_extraction_rejects_foreign_pool_candidates() -> None:
     }
 
 
+def test_storage_drive_extraction_rejects_known_foreign_pool_members() -> None:
+    """Known stale local disks should not override explicit foreign pool refs."""
+    payload = {
+        "pools": [
+            {
+                "id": "pool-a",
+                "label": "Primary",
+                "driveCount": 6,
+                "drives": [
+                    *[
+                        {
+                            "serial": f"disk-{index}",
+                            "temperature": 30 + index,
+                        }
+                        for index in range(1, 5)
+                    ],
+                    {
+                        "serial": "stale-disk",
+                        "temperature": 39,
+                    },
+                ],
+            }
+        ],
+        "disks": [
+            {
+                "serial": f"disk-{index}",
+                "poolId": "pool-a",
+                "healthScore": 5,
+            }
+            for index in range(1, 5)
+        ]
+        + [
+            {
+                "serial": "stale-disk",
+                "poolId": "pool-b",
+                "healthScore": 5,
+            },
+            {
+                "serial": "disk-5",
+                "poolId": "pool-a",
+                "healthScore": 5,
+            },
+            {
+                "serial": "disk-6",
+                "poolId": "pool-a",
+                "healthScore": 5,
+            },
+        ],
+    }
+
+    pools = sensor_module._pools(payload)
+    drives = sensor_module._pool_drives(pools[0])
+
+    assert len(drives) == 6
+    assert {sensor_module._drive_key(drive, index) for index, drive in enumerate(drives)} == {
+        "disk_1",
+        "disk_2",
+        "disk_3",
+        "disk_4",
+        "disk_5",
+        "disk_6",
+    }
+
+
 def test_storage_drive_extraction_does_not_guess_ambiguous_single_pool_extras() -> None:
     """Single-pool fallback should not guess when extra global disks are ambiguous."""
     payload = {
