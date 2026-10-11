@@ -1207,6 +1207,91 @@ def test_storage_drive_extraction_rejects_known_foreign_pool_members() -> None:
     }
 
 
+def test_storage_drive_extraction_rejects_foreign_raid_group_candidates() -> None:
+    """Foreign raid-group disks should not be guessed into a single pool."""
+    payload = {
+        "pools": [
+            {
+                "id": "pool-a",
+                "label": "Primary",
+                "activeRaidGroupId": "raid-a",
+                "driveCount": 6,
+                "drives": [
+                    {
+                        "serial": f"disk-{index}",
+                        "raidGroupId": "raid-a",
+                    }
+                    for index in range(1, 6)
+                ],
+            }
+        ],
+        "disks": [
+            {
+                "serial": f"disk-{index}",
+                "raidGroupId": "raid-a",
+                "healthScore": 5,
+            }
+            for index in range(1, 6)
+        ]
+        + [
+            {
+                "serial": "foreign-disk",
+                "raidGroupId": "raid-b",
+                "healthScore": 5,
+            }
+        ],
+    }
+
+    pools = sensor_module._pools(payload)
+    drives = sensor_module._pool_drives(pools[0])
+
+    assert len(drives) == 5
+    assert "foreign_disk" not in {
+        sensor_module._drive_key(drive, index) for index, drive in enumerate(drives)
+    }
+
+
+def test_storage_drive_extraction_matches_compatible_identity_fields() -> None:
+    """Drive IDs should not match another drive's slot or bay value."""
+    payload = {
+        "pools": [
+            {
+                "id": "pool-a",
+                "label": "Primary",
+                "driveCount": 2,
+                "drives": [
+                    {
+                        "serial": "serial-a",
+                        "slotId": "1",
+                        "temperature": 31,
+                    }
+                ],
+            }
+        ],
+        "disks": [
+            {
+                "id": "1",
+                "serial": "serial-b",
+                "poolId": "pool-a",
+                "healthScore": 5,
+            },
+            {
+                "serial": "serial-a",
+                "poolId": "pool-a",
+                "healthScore": 5,
+            },
+        ],
+    }
+
+    pools = sensor_module._pools(payload)
+    drives = sensor_module._pool_drives(pools[0])
+
+    assert len(drives) == 2
+    assert {drive.get("serial") for drive in drives} == {"serial-a", "serial-b"}
+    serial_a = next(drive for drive in drives if drive.get("serial") == "serial-a")
+    assert sensor_module._drive_temperature(serial_a) == 31.0
+
+
 def test_storage_drive_extraction_does_not_guess_ambiguous_single_pool_extras() -> None:
     """Single-pool fallback should not guess when extra global disks are ambiguous."""
     payload = {

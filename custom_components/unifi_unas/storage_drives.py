@@ -76,6 +76,16 @@ DRIVE_EXPLICIT_POOL_REFERENCE_KEYS = (
     "storage_pool_id",
     "volumeId",
     "volume_id",
+    "raidGroupId",
+    "raid_group_id",
+    "activeRaidGroupId",
+    "active_raid_group_id",
+)
+DRIVE_IDENTITY_KEY_GROUPS = (
+    ("stable_id", ("id", "uuid", "guid")),
+    ("serial", ("serial", "wwn")),
+    ("disk_name", ("diskName", "disk_name")),
+    ("location", ("slotId", "slot", "bay")),
 )
 DRIVE_NON_POOL_BOOL_KEYS = (
     "empty",
@@ -349,8 +359,7 @@ def _drive_references_foreign_pool(
 
 def _append_unique_drive(drives: list[dict[str, Any]], drive: dict[str, Any]) -> None:
     """Append a drive if its known identity is not already present."""
-    drive_values = _drive_identity_values(drive)
-    if any(drive_values and drive_values & _drive_identity_values(item) for item in drives):
+    if any(_drive_identity_matches(drive, item) for item in drives):
         return
     drives.append(drive)
 
@@ -359,12 +368,11 @@ def _matching_known_drive(
     drive: dict[str, Any], known_drives: list[dict[str, Any]]
 ) -> dict[str, Any] | None:
     """Return a known drive matching a global drive by stable identity."""
-    drive_values = _drive_identity_values(drive)
-    if not drive_values:
+    if not _drive_identity_groups(drive):
         return None
 
     for known_drive in known_drives:
-        if drive_values & _drive_identity_values(known_drive):
+        if _drive_identity_matches(drive, known_drive):
             return known_drive
     return None
 
@@ -390,25 +398,31 @@ def _is_missing_drive_value(value: Any) -> bool:
     return value in (None, "", [], {})
 
 
-def _drive_identity_values(drive: dict[str, Any]) -> set[str]:
-    """Return stable identity values for drive reconciliation."""
-    values: set[str] = set()
-    for key in (
-        "id",
-        "uuid",
-        "guid",
-        "serial",
-        "wwn",
-        "diskName",
-        "disk_name",
-        "slotId",
-        "slot",
-        "bay",
-    ):
-        value = _text(drive.get(key))
-        if value:
-            values.add(_normalized_token(value))
-    return values
+def _drive_identity_matches(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    """Return whether two drive records share a compatible identity value."""
+    left_groups = _drive_identity_groups(left)
+    if not left_groups:
+        return False
+
+    right_groups = _drive_identity_groups(right)
+    return any(
+        bool(values & right_groups.get(group, set()))
+        for group, values in left_groups.items()
+    )
+
+
+def _drive_identity_groups(drive: dict[str, Any]) -> dict[str, set[str]]:
+    """Return grouped drive identity values for safe reconciliation."""
+    groups: dict[str, set[str]] = {}
+    for group, keys in DRIVE_IDENTITY_KEY_GROUPS:
+        values = {
+            _normalized_token(value)
+            for key in keys
+            if (value := _text(drive.get(key)))
+        }
+        if values:
+            groups[group] = values
+    return groups
 
 
 def _drive_looks_non_pool_member(drive: dict[str, Any]) -> bool:
@@ -450,6 +464,10 @@ def _drive_has_explicit_pool_reference(drive: dict[str, Any]) -> bool:
             "storage_pool_id",
             "volumeId",
             "volume_id",
+            "raidGroupId",
+            "raid_group_id",
+            "activeRaidGroupId",
+            "active_raid_group_id",
         )
     )
 
@@ -562,6 +580,10 @@ def _drive_pool_reference_matches(drive: dict[str, Any], pool_id: str) -> bool:
             "storage_pool_id",
             "volumeId",
             "volume_id",
+            "raidGroupId",
+            "raid_group_id",
+            "activeRaidGroupId",
+            "active_raid_group_id",
         ):
             if _text(pool.get(key)) == pool_id:
                 return True
@@ -583,6 +605,10 @@ def _pool_reference_values(pool: dict[str, Any]) -> list[str]:
         "storage_pool_id",
         "volumeId",
         "volume_id",
+        "raidGroupId",
+        "raid_group_id",
+        "activeRaidGroupId",
+        "active_raid_group_id",
         "name",
         "label",
         "poolName",
