@@ -63,6 +63,20 @@ DRIVE_POOL_KEYS = (
     "activeRaidGroupId",
     "active_raid_group_id",
 )
+DRIVE_EXPLICIT_POOL_REFERENCE_KEYS = (
+    "poolId",
+    "pool_id",
+    "poolGuid",
+    "pool_guid",
+    "poolUuid",
+    "pool_uuid",
+    "poolName",
+    "pool_name",
+    "storagePoolId",
+    "storage_pool_id",
+    "volumeId",
+    "volume_id",
+)
 DRIVE_NON_POOL_BOOL_KEYS = (
     "empty",
     "hotSpare",
@@ -305,6 +319,8 @@ def _global_pool_member_drives(
         ):
             _append_unique_drive(members, drive)
             continue
+        if _drive_has_explicit_pool_reference(drive):
+            continue
         _append_unique_drive(candidates, drive)
 
     if len(members) > expected_count:
@@ -377,6 +393,33 @@ def _drive_looks_non_pool_member(drive: dict[str, Any]) -> bool:
         if any(hint in normalized for hint in DRIVE_NON_POOL_HINTS):
             return True
     return False
+
+
+def _drive_has_explicit_pool_reference(drive: dict[str, Any]) -> bool:
+    """Return whether a drive explicitly references a storage pool."""
+    if any(_text(drive.get(key)) for key in DRIVE_EXPLICIT_POOL_REFERENCE_KEYS):
+        return True
+
+    pool = drive.get("pool")
+    if not isinstance(pool, dict):
+        return False
+
+    return any(
+        _text(pool.get(key))
+        for key in (
+            "id",
+            "uuid",
+            "guid",
+            "name",
+            "label",
+            "poolId",
+            "pool_id",
+            "storagePoolId",
+            "storage_pool_id",
+            "volumeId",
+            "volume_id",
+        )
+    )
 
 
 def _collect_direct_pool_drives(pool: dict[str, Any]) -> list[dict[str, Any]]:

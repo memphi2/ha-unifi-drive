@@ -1019,6 +1019,51 @@ def test_storage_drive_extraction_filters_single_pool_global_spares() -> None:
     }
 
 
+def test_storage_drive_extraction_rejects_foreign_pool_candidates() -> None:
+    """Single-pool global fallback should not promote foreign pool disks."""
+    payload = {
+        "pools": [
+            {
+                "id": "pool-a",
+                "label": "Primary",
+                "driveCount": 6,
+                "drives": [
+                    {
+                        "serial": f"disk-{index}",
+                        "temperature": 30 + index,
+                    }
+                    for index in range(1, 6)
+                ],
+            }
+        ],
+        "disks": [
+            {
+                "serial": f"disk-{index}",
+                "poolId": "pool-a",
+                "temperature": 30 + index,
+                "healthScore": 5,
+            }
+            for index in range(1, 6)
+        ]
+        + [
+            {
+                "serial": "foreign-disk",
+                "poolId": "pool-b",
+                "temperature": 41,
+                "healthScore": 5,
+            }
+        ],
+    }
+
+    pools = sensor_module._pools(payload)
+    drives = sensor_module._pool_drives(pools[0])
+
+    assert len(drives) == 5
+    assert "foreign_disk" not in {
+        sensor_module._drive_key(drive, index) for index, drive in enumerate(drives)
+    }
+
+
 def test_storage_drive_extraction_does_not_guess_ambiguous_single_pool_extras() -> None:
     """Single-pool fallback should not guess when extra global disks are ambiguous."""
     payload = {
