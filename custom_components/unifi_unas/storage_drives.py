@@ -303,15 +303,14 @@ def _global_pool_member_drives(
 ) -> list[dict[str, Any]]:
     """Return global drives that can be safely treated as pool members."""
     pool_references = _pool_reference_values(pool)
-    known_identity_values = _drive_identity_values_from_drives(known_drives)
     members: list[dict[str, Any]] = []
     candidates: list[dict[str, Any]] = []
 
     for drive in drives:
         if _drive_looks_non_pool_member(drive):
             continue
-        if _drive_matches_identity_values(drive, known_identity_values):
-            _append_unique_drive(members, drive)
+        if known_drive := _matching_known_drive(drive, known_drives):
+            _append_unique_drive(members, _merge_drive_entries(drive, known_drive))
             continue
         if pool_references and any(
             _drive_pool_reference_matches(drive, pool_reference)
@@ -342,19 +341,39 @@ def _append_unique_drive(drives: list[dict[str, Any]], drive: dict[str, Any]) ->
     drives.append(drive)
 
 
-def _drive_identity_values_from_drives(drives: list[dict[str, Any]]) -> set[str]:
-    """Return normalized identity values from drive-like dictionaries."""
-    values: set[str] = set()
-    for drive in drives:
-        values.update(_drive_identity_values(drive))
-    return values
+def _matching_known_drive(
+    drive: dict[str, Any], known_drives: list[dict[str, Any]]
+) -> dict[str, Any] | None:
+    """Return a known drive matching a global drive by stable identity."""
+    drive_values = _drive_identity_values(drive)
+    if not drive_values:
+        return None
+
+    for known_drive in known_drives:
+        if drive_values & _drive_identity_values(known_drive):
+            return known_drive
+    return None
 
 
-def _drive_matches_identity_values(
-    drive: dict[str, Any], identity_values: set[str]
-) -> bool:
-    """Return whether a drive matches any known identity value."""
-    return bool(identity_values and _drive_identity_values(drive) & identity_values)
+def _merge_drive_entries(
+    global_drive: dict[str, Any], local_drive: dict[str, Any]
+) -> dict[str, Any]:
+    """Merge a global drive record with richer local pool-member data."""
+    merged = dict(global_drive)
+    for key, value in local_drive.items():
+        current = merged.get(key)
+        if isinstance(current, dict) and isinstance(value, dict):
+            merged[key] = _merge_drive_entries(current, value)
+        elif not _is_missing_drive_value(value):
+            merged[key] = value
+        elif key not in merged:
+            merged[key] = value
+    return merged
+
+
+def _is_missing_drive_value(value: Any) -> bool:
+    """Return whether a drive field carries no useful value."""
+    return value in (None, "", [], {})
 
 
 def _drive_identity_values(drive: dict[str, Any]) -> set[str]:
@@ -368,7 +387,6 @@ def _drive_identity_values(drive: dict[str, Any]) -> set[str]:
         "wwn",
         "diskName",
         "disk_name",
-        "name",
         "slotId",
         "slot",
         "bay",

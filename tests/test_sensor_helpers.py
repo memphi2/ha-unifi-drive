@@ -1019,6 +1019,85 @@ def test_storage_drive_extraction_filters_single_pool_global_spares() -> None:
     }
 
 
+def test_storage_drive_extraction_preserves_local_metrics_when_completing_global() -> None:
+    """Global completion should keep richer local metrics for known drives."""
+    payload = {
+        "pools": [
+            {
+                "id": "pool-a",
+                "label": "Primary",
+                "driveCount": 6,
+                "drives": [
+                    {
+                        "serial": f"disk-{index}",
+                        "temperature": 30 + index,
+                        "powerOnHours": 1000 + index,
+                        "status": "healthy",
+                    }
+                    for index in range(1, 6)
+                ],
+            }
+        ],
+        "disks": [
+            {
+                "serial": f"disk-{index}",
+                "poolId": "pool-a",
+            }
+            for index in range(1, 7)
+        ],
+    }
+
+    pools = sensor_module._pools(payload)
+    drives = sensor_module._pool_drives(pools[0])
+
+    assert len(drives) == 6
+    assert sensor_module._drive_key(drives[5], 5) == "disk_6"
+    assert sensor_module._drive_temperature(drives[0]) == 31.0
+    assert sensor_module._drive_power_on_hours(drives[0]) == 1001
+    assert sensor_module._drive_health(drives[0]) == "optimal"
+
+
+def test_storage_drive_extraction_ignores_non_unique_display_names() -> None:
+    """Drive display names should not collapse global identity matching."""
+    payload = {
+        "pools": [
+            {
+                "id": "pool-a",
+                "label": "Primary",
+                "driveCount": 6,
+                "drives": [
+                    {
+                        "name": "Drive",
+                        "temperature": 30 + index,
+                    }
+                    for index in range(1, 6)
+                ],
+            }
+        ],
+        "disks": [
+            {
+                "name": "Drive",
+                "serial": f"disk-{index}",
+                "poolId": "pool-a",
+            }
+            for index in range(1, 7)
+        ],
+    }
+
+    pools = sensor_module._pools(payload)
+    drives = sensor_module._pool_drives(pools[0])
+
+    assert len(drives) == 6
+    assert {sensor_module._drive_key(drive, index) for index, drive in enumerate(drives)} == {
+        "disk_1",
+        "disk_2",
+        "disk_3",
+        "disk_4",
+        "disk_5",
+        "disk_6",
+    }
+
+
 def test_storage_drive_extraction_rejects_foreign_pool_candidates() -> None:
     """Single-pool global fallback should not promote foreign pool disks."""
     payload = {
