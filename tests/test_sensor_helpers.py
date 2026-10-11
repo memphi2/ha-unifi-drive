@@ -996,6 +996,7 @@ def test_storage_drive_extraction_filters_single_pool_global_spares() -> None:
         + [
             {
                 "serial": "spare-1",
+                "poolId": "pool-a",
                 "role": "hot_spare",
                 "temperature": 28,
                 "healthScore": 5,

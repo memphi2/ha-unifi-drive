@@ -294,6 +294,8 @@ def _global_pool_member_drives(
     candidates: list[dict[str, Any]] = []
 
     for drive in drives:
+        if _drive_looks_non_pool_member(drive):
+            continue
         if _drive_matches_identity_values(drive, known_identity_values):
             _append_unique_drive(members, drive)
             continue
@@ -303,8 +305,7 @@ def _global_pool_member_drives(
         ):
             _append_unique_drive(members, drive)
             continue
-        if not _drive_looks_non_pool_member(drive):
-            _append_unique_drive(candidates, drive)
+        _append_unique_drive(candidates, drive)
 
     if len(members) > expected_count:
         return []
