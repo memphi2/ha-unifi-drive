@@ -5,6 +5,8 @@
 Patch development for the next `0.8.x` maintenance release:
 
 - Updates the current Home Assistant validation target to `2026.10.0`.
+- Aligns the `unifi-discovery` requirement with the current Home Assistant
+  dependency line used by Hassfest.
 - Pins `pytest-homeassistant-custom-component` to the matching `0.13.371`
   release so the current CI leg is dependency-resolvable.
 - Keeps the advertised HACS minimum line on Home Assistant `2024.8.0` with
