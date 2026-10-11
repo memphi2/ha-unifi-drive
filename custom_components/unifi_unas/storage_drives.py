@@ -63,6 +63,16 @@ DRIVE_POOL_KEYS = (
     "activeRaidGroupId",
     "active_raid_group_id",
 )
+POOL_DRIVE_COUNT_KEYS = (
+    "driveCount",
+    "diskCount",
+    "memberCount",
+    "numDrives",
+    "numDisks",
+    "numberOfDisks",
+    "diskNum",
+    "memberNum",
+)
 DRIVE_DETAIL_CONTAINER_KEYS = (
     "details",
     "disk",
@@ -152,22 +162,10 @@ def _pool_drive_count(pool: dict[str, Any]) -> int | None:
     if drives:
         return len(drives)
 
-    direct = _first_number(
-        pool,
-        (
-            "driveCount",
-            "diskCount",
-            "memberCount",
-            "numDrives",
-            "numDisks",
-            "numberOfDisks",
-            "diskNum",
-            "memberNum",
-        ),
-    )
+    direct = _declared_pool_drive_count(pool)
     if direct is None:
         return None
-    return int(round(direct))
+    return direct
 
 
 def _pool_at_risk_drive_count(pool: dict[str, Any]) -> int | None:
@@ -188,23 +186,56 @@ def _pool_average_drive_temperature(pool: dict[str, Any]) -> float | None:
 
 def _pool_drives(pool: dict[str, Any]) -> list[dict[str, Any]]:
     """Return best-effort list of drives for a pool."""
-    direct_drives = _collect_direct_pool_drives(pool)
-    if direct_drives:
-        return direct_drives
+    for collector in (
+        _collect_direct_pool_drives,
+        _collect_nested_pool_drives,
+        _collect_nested_raid_drives,
+        _collect_global_reference_drives,
+        _collect_raid_group_reference_drives,
+    ):
+        drives = collector(pool)
+        if drives:
+            return _complete_single_pool_global_drives(pool, drives)
 
-    nested_drives = _collect_nested_pool_drives(pool)
-    if nested_drives:
-        return nested_drives
+    return _collect_single_pool_global_drives(pool)
 
-    nested_raid_drives = _collect_nested_raid_drives(pool)
-    if nested_raid_drives:
-        return nested_raid_drives
 
-    global_ref_drives = _collect_global_reference_drives(pool)
-    if global_ref_drives:
-        return global_ref_drives
+def _declared_pool_drive_count(pool: dict[str, Any]) -> int | None:
+    """Return the drive count declared directly by a pool payload."""
+    direct = _first_number(pool, POOL_DRIVE_COUNT_KEYS)
+    if direct is None:
+        return None
+    return int(round(direct))
 
-    return _collect_raid_group_reference_drives(pool)
+
+def _complete_single_pool_global_drives(
+    pool: dict[str, Any], drives: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """Prefer complete single-pool global disk data when local drive lists lag."""
+    global_drives = _collect_single_pool_global_drives(pool)
+    if len(global_drives) > len(drives):
+        return global_drives
+    return drives
+
+
+def _collect_single_pool_global_drives(pool: dict[str, Any]) -> list[dict[str, Any]]:
+    """Collect global disks when a single-pool payload declares them as members."""
+    pool_count = pool.get("__pool_count")
+    if pool_count != 1:
+        return []
+
+    expected_count = _declared_pool_drive_count(pool)
+    if expected_count is None or expected_count < 1:
+        return []
+
+    global_disks = pool.get("__global_disks")
+    if not isinstance(global_disks, list):
+        return []
+
+    drives = [disk for disk in global_disks if isinstance(disk, dict)]
+    if len(drives) != expected_count:
+        return []
+    return drives
 
 
 def _collect_direct_pool_drives(pool: dict[str, Any]) -> list[dict[str, Any]]:

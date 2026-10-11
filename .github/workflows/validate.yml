@@ -48,9 +48,9 @@ jobs:
           - homeassistant: "2024.8.0"
             python: "3.12"
             pytest_homeassistant: "0.13.152"
-          - homeassistant: "2026.6.0"
+          - homeassistant: "2026.10.0"
             python: "3.14"
-            pytest_homeassistant: "0.13.334"
+            pytest_homeassistant: "0.13.371"
     steps:
       - name: Checkout
         uses: actions/checkout@v6

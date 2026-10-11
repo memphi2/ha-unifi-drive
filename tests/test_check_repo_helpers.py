@@ -156,6 +156,37 @@ def test_config_flow_reload_methods_are_rejected(
         module.check_config_flow_reload_methods()
 
 
+def test_homeassistant_deprecation_guards_reject_device_entry_shims(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Repository checks should reject HA 2026.10 DeviceEntry shim usage."""
+    module = _load_check_repo_module()
+    integration_dir = tmp_path / "custom_components" / "unifi_unas"
+    integration_dir.mkdir(parents=True)
+    (integration_dir / "__init__.py").write_text(
+        "entry_id = device_entry.config_entry_id\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(module, "INTEGRATION_DIR", integration_dir)
+
+    module.check_homeassistant_deprecation_guards()
+
+    (integration_dir / "__init__.py").write_text(
+        "entry_ids = device_entry.config_entries\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit):
+        module.check_homeassistant_deprecation_guards()
+
+    (integration_dir / "__init__.py").write_text(
+        "entry_id = device.primary_config_entry\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit):
+        module.check_homeassistant_deprecation_guards()
+
+
 def test_workflow_action_versions_reject_node20_actions(
     tmp_path,
     monkeypatch: pytest.MonkeyPatch,
@@ -205,7 +236,7 @@ def test_workflow_python_versions_require_compatibility_matrix(
         "    include:\n"
         "      - homeassistant: \"2024.8.0\"\n"
         "        python: \"3.12\"\n"
-        "      - homeassistant: \"2026.6.0\"\n"
+        "      - homeassistant: \"2026.10.0\"\n"
         "        python: \"3.14\"\n"
         "steps:\n"
         "  - uses: actions/setup-python@v6\n"
@@ -249,9 +280,9 @@ def test_validate_workflow_requires_homeassistant_compatibility_targets(
         "      - homeassistant: \"2024.8.0\"\n"
         "        python: \"3.12\"\n"
         "        pytest_homeassistant: \"0.13.152\"\n"
-        "      - homeassistant: \"2026.6.0\"\n"
+        "      - homeassistant: \"2026.10.0\"\n"
         "        python: \"3.14\"\n"
-        "        pytest_homeassistant: \"0.13.334\"\n"
+        "        pytest_homeassistant: \"0.13.371\"\n"
         "steps:\n"
         "  - uses: actions/setup-python@v6\n"
         "    with:\n"
@@ -280,7 +311,7 @@ def test_validate_workflow_requires_homeassistant_compatibility_targets(
 
     workflow_path.write_text(
         workflow_path.read_text(encoding="utf-8").replace(
-            '        pytest_homeassistant: "0.13.334"\n',
+            '        pytest_homeassistant: "0.13.371"\n',
             "",
         ),
         encoding="utf-8",
@@ -295,9 +326,9 @@ def test_validate_workflow_requires_homeassistant_compatibility_targets(
         "      - homeassistant: \"2024.8.0\"\n"
         "        python: \"3.12\"\n"
         "        pytest_homeassistant: \"0.13.152\"\n"
-        "      - homeassistant: \"2026.6.0\"\n"
+        "      - homeassistant: \"2026.10.0\"\n"
         "        python: \"3.14\"\n"
-        "        pytest_homeassistant: \"0.13.334\"\n"
+        "        pytest_homeassistant: \"0.13.371\"\n"
         "steps:\n"
         "  - uses: actions/setup-python@v6\n"
         "    with:\n"
@@ -329,9 +360,9 @@ def test_validate_workflow_must_cover_hacs_minimum(
         "      - homeassistant: \"2024.8.0\"\n"
         "        python: \"3.12\"\n"
         "        pytest_homeassistant: \"0.13.152\"\n"
-        "      - homeassistant: \"2026.6.0\"\n"
+        "      - homeassistant: \"2026.10.0\"\n"
         "        python: \"3.14\"\n"
-        "        pytest_homeassistant: \"0.13.334\"\n"
+        "        pytest_homeassistant: \"0.13.371\"\n"
         "steps:\n"
         "  - run: |\n"
         "      pip install "

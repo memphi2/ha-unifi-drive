@@ -141,11 +141,13 @@ def _pools(data: dict[str, Any] | None) -> list[dict[str, Any]]:
     disks_list = _global_disks(data)
 
     normalized: list[dict[str, Any]] = []
+    pool_count = len(pools)
     for pool in pools:
         if not isinstance(pool, dict):
             continue
         pool_with_context = dict(pool)
         pool_with_context["__global_disks"] = disks_list
+        pool_with_context["__pool_count"] = pool_count
         normalized.append(pool_with_context)
     return normalized
 

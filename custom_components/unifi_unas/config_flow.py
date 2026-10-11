@@ -8,8 +8,6 @@ from dataclasses import dataclass
 import logging
 from typing import Any, TypeAlias
 
-import voluptuous as vol
-
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import (
@@ -84,6 +82,7 @@ from .entry_options import (
     merged_entry_data_with_connection_updates,
     merged_feature_options,
 )
+from . import ha_validation as vol
 from .runtime import UnifiDriveConfigEntry
 from .wake_on_lan import normalize_mac_address, validate_ipv4_address
 from .security import safe_error_text

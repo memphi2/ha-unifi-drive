@@ -39,6 +39,10 @@ Home Assistant installations.
 - IoT class: local polling
 - Quality target: Bronze/Silver/Gold tracked as implemented, Platinum-track
   hardening in progress
+- Validation coverage: Home Assistant `2024.8.0` minimum and current
+  `2026.10.0` target line
+- Current maintenance focus: Home Assistant compatibility and robust dynamic
+  drive discovery during pool expansion
 
 This is a custom integration and does not claim official Home Assistant Core
 certification.

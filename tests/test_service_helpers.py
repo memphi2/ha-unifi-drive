@@ -93,7 +93,10 @@ def _load_services_module():
     vol_pkg.Required = lambda key, default=None: key
     vol_pkg.Optional = lambda key, default=None: key
     vol_pkg.Schema = lambda schema: schema
+    vol_pkg.All = lambda *validators: validators[-1] if validators else (lambda value: value)
+    vol_pkg.Coerce = lambda target: target
     vol_pkg.In = lambda options: (lambda value: value if value in options else None)
+    vol_pkg.Range = lambda **kwargs: (lambda value: value)
     sys.modules["voluptuous"] = vol_pkg
 
     api_pkg = types.ModuleType("custom_components.unifi_unas.api")

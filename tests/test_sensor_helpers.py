@@ -590,6 +590,80 @@ def test_sensor_setup_adds_new_drive_entities_for_existing_pool() -> None:
     assert not any("_pool_a_pool_status" in uid for uid in added_unique_ids)
 
 
+def test_sensor_setup_adds_new_global_drive_entities_for_single_pool_expansion() -> None:
+    """Single-pool global disk updates should add entities for newly expanded drives."""
+    listeners = []
+    unload_callbacks = []
+    coordinator = _FakeUpdateCoordinator(
+        {
+            "pools": [
+                {
+                    "id": "pool-a",
+                    "name": "Primary",
+                    "driveCount": 5,
+                }
+            ],
+            "disks": [
+                {"serial": f"disk-{index}", "status": "healthy", "temperature": 30 + index}
+                for index in range(1, 6)
+            ],
+        }
+    )
+    coordinator.snapshot_settings = []
+
+    def _add_listener(listener):
+        listeners.append(listener)
+        return lambda: None
+
+    coordinator.async_add_listener = _add_listener
+    entry = types.SimpleNamespace(
+        entry_id="entry-1",
+        unique_id="device-1",
+        title="UNAS",
+        data={"snapshot_buttons_enabled": False},
+        runtime_data=coordinator,
+        async_on_unload=unload_callbacks.append,
+    )
+    batches = []
+
+    def _add_entities(entities):
+        batches.append(list(entities))
+
+    asyncio.run(sensor_module.async_setup_entry(None, entry, _add_entities))
+
+    initial_unique_ids = {
+        getattr(entity, "_attr_unique_id", None)
+        for batch in batches
+        for entity in batch
+    }
+    assert any("_pool_a_disk_5_drive_status" in uid for uid in initial_unique_ids)
+    assert not any("_pool_a_disk_6_drive_status" in uid for uid in initial_unique_ids)
+
+    coordinator.data = {
+        "pools": [
+            {
+                "id": "pool-a",
+                "name": "Primary",
+                "driveCount": 6,
+            }
+        ],
+        "disks": [
+            {"serial": f"disk-{index}", "status": "healthy", "temperature": 30 + index}
+            for index in range(1, 7)
+        ],
+    }
+    listeners[0]()
+
+    added_unique_ids = {
+        getattr(entity, "_attr_unique_id", None)
+        for entity in batches[-1]
+    }
+    assert {
+        f"device-1_pool_a_disk_6_{description.key}"
+        for description in sensor_module.DRIVE_SENSOR_TYPES
+    } <= added_unique_ids
+
+
 def test_binary_sensor_properties_cover_aggregate_and_dynamic_pools() -> None:
     """Binary sensors should expose problem metadata and clear stale pools."""
     pool = {
@@ -860,6 +934,59 @@ def test_storage_pool_drive_collection_paths() -> None:
     assert sensor_module._pool_average_drive_temperature(
         {"disks": [{"temperature": 30}, {"temperature": 32}]}
     ) == 31.0
+
+
+def test_storage_drive_extraction_uses_single_pool_global_disk_count() -> None:
+    """Global disks should backfill single-pool payloads without per-disk refs."""
+    payload = {
+        "pools": [
+            {
+                "id": "pool-a",
+                "label": "Primary",
+                "driveCount": 6,
+            }
+        ],
+        "disks": [
+            {
+                "serial": f"disk-{index}",
+                "temperature": 30 + index,
+                "powerOnHours": 1000 + index,
+                "healthScore": 5,
+            }
+            for index in range(1, 7)
+        ],
+    }
+
+    pools = sensor_module._pools(payload)
+    drives = sensor_module._pool_drives(pools[0])
+
+    assert len(drives) == 6
+    assert sensor_module._pool_drive_count(pools[0]) == 6
+    assert sensor_module._drive_key(drives[5], 5) == "disk_6"
+    assert sensor_module._drive_temperature(drives[5]) == 36.0
+    assert sensor_module._drive_power_on_hours(drives[5]) == 1006
+
+
+def test_storage_drive_extraction_does_not_guess_global_disks_for_multiple_pools() -> None:
+    """Unreferenced global disks should not be assigned across multiple pools."""
+    payload = {
+        "pools": [
+            {"id": "pool-a", "driveCount": 2},
+            {"id": "pool-b", "driveCount": 1},
+        ],
+        "disks": [
+            {"serial": "disk-1", "temperature": 31},
+            {"serial": "disk-2", "temperature": 32},
+            {"serial": "disk-3", "temperature": 33},
+        ],
+    }
+
+    pools = sensor_module._pools(payload)
+
+    assert sensor_module._pool_drives(pools[0]) == []
+    assert sensor_module._pool_drives(pools[1]) == []
+    assert sensor_module._pool_drive_count(pools[0]) == 2
+    assert sensor_module._pool_drive_count(pools[1]) == 1
 
 
 def test_storage_pool_list_and_identity_fallbacks() -> None:
