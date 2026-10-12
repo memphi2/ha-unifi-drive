@@ -1292,6 +1292,50 @@ def test_storage_drive_extraction_matches_compatible_identity_fields() -> None:
     assert sensor_module._drive_temperature(serial_a) == 31.0
 
 
+def test_storage_drive_extraction_rejects_slot_match_with_serial_conflict() -> None:
+    """Stale local slot data should not overwrite a replacement drive."""
+    payload = {
+        "pools": [
+            {
+                "id": "pool-a",
+                "label": "Primary",
+                "driveCount": 2,
+                "drives": [
+                    {
+                        "serial": "old-serial",
+                        "slotId": "1",
+                        "temperature": 31,
+                    }
+                ],
+            }
+        ],
+        "disks": [
+            {
+                "serial": "new-serial",
+                "slotId": "1",
+                "poolId": "pool-a",
+                "temperature": 36,
+                "healthScore": 5,
+            },
+            {
+                "serial": "disk-2",
+                "slotId": "2",
+                "poolId": "pool-a",
+                "temperature": 32,
+                "healthScore": 5,
+            },
+        ],
+    }
+
+    pools = sensor_module._pools(payload)
+    drives = sensor_module._pool_drives(pools[0])
+
+    assert len(drives) == 2
+    assert {drive.get("serial") for drive in drives} == {"new-serial", "disk-2"}
+    replacement = next(drive for drive in drives if drive.get("serial") == "new-serial")
+    assert sensor_module._drive_temperature(replacement) == 36.0
+
+
 def test_storage_drive_extraction_does_not_guess_ambiguous_single_pool_extras() -> None:
     """Single-pool fallback should not guess when extra global disks are ambiguous."""
     payload = {

@@ -87,6 +87,7 @@ DRIVE_IDENTITY_KEY_GROUPS = (
     ("disk_name", ("diskName", "disk_name")),
     ("location", ("slotId", "slot", "bay")),
 )
+DRIVE_STRONG_IDENTITY_GROUPS = ("stable_id", "serial")
 DRIVE_NON_POOL_BOOL_KEYS = (
     "empty",
     "hotSpare",
@@ -405,10 +406,25 @@ def _drive_identity_matches(left: dict[str, Any], right: dict[str, Any]) -> bool
         return False
 
     right_groups = _drive_identity_groups(right)
+    if _drive_identity_has_strong_conflict(left_groups, right_groups):
+        return False
+
     return any(
         bool(values & right_groups.get(group, set()))
         for group, values in left_groups.items()
     )
+
+
+def _drive_identity_has_strong_conflict(
+    left_groups: dict[str, set[str]], right_groups: dict[str, set[str]]
+) -> bool:
+    """Return whether strong drive identity groups are contradictory."""
+    for group in DRIVE_STRONG_IDENTITY_GROUPS:
+        left_values = left_groups.get(group)
+        right_values = right_groups.get(group)
+        if left_values and right_values and not left_values & right_values:
+            return True
+    return False
 
 
 def _drive_identity_groups(drive: dict[str, Any]) -> dict[str, set[str]]:
