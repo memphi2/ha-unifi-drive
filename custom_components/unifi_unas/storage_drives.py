@@ -81,13 +81,35 @@ DRIVE_EXPLICIT_POOL_REFERENCE_KEYS = (
     "activeRaidGroupId",
     "active_raid_group_id",
 )
+DRIVE_STABLE_POOL_REFERENCE_KEYS = tuple(
+    key for key in DRIVE_EXPLICIT_POOL_REFERENCE_KEYS if key not in {"poolName", "pool_name"}
+)
+POOL_STABLE_REFERENCE_KEYS = (
+    "id",
+    "poolId",
+    "pool_id",
+    "poolGuid",
+    "pool_guid",
+    "uuid",
+    "guid",
+    "storagePoolId",
+    "storage_pool_id",
+    "volumeId",
+    "volume_id",
+    "raidGroupId",
+    "raid_group_id",
+    "activeRaidGroupId",
+    "active_raid_group_id",
+)
 DRIVE_IDENTITY_KEY_GROUPS = (
-    ("stable_id", ("id", "uuid", "guid")),
+    ("id", ("id",)),
+    ("uuid", ("uuid",)),
+    ("guid", ("guid",)),
     ("serial", ("serial", "wwn")),
     ("disk_name", ("diskName", "disk_name")),
     ("location", ("slotId", "slot", "bay")),
 )
-DRIVE_STRONG_IDENTITY_GROUPS = ("stable_id", "serial")
+DRIVE_STRONG_IDENTITY_GROUPS = ("id", "uuid", "guid", "serial")
 DRIVE_NON_POOL_BOOL_KEYS = (
     "empty",
     "hotSpare",
@@ -314,13 +336,16 @@ def _global_pool_member_drives(
 ) -> list[dict[str, Any]]:
     """Return global drives that can be safely treated as pool members."""
     pool_references = _pool_reference_values(pool)
+    pool_stable_references = _pool_stable_reference_values(pool)
     members: list[dict[str, Any]] = []
     candidates: list[dict[str, Any]] = []
 
     for drive in drives:
         if _drive_looks_non_pool_member(drive):
             continue
-        if _drive_references_foreign_pool(drive, pool_references):
+        if _drive_references_foreign_pool(
+            drive, pool_references, pool_stable_references
+        ):
             continue
         if known_drive := _matching_known_drive(drive, known_drives):
             _append_unique_drive(members, _merge_drive_entries(drive, known_drive))
@@ -347,15 +372,36 @@ def _global_pool_member_drives(
 
 
 def _drive_references_foreign_pool(
-    drive: dict[str, Any], pool_references: list[str]
+    drive: dict[str, Any],
+    pool_references: list[str],
+    pool_stable_references: set[str],
 ) -> bool:
     """Return whether a drive explicitly references a different pool."""
+    drive_stable_references = _drive_stable_pool_reference_values(drive)
+    if (
+        drive_stable_references
+        and pool_stable_references
+        and not drive_stable_references & pool_stable_references
+    ):
+        return True
+
     if not _drive_has_explicit_pool_reference(drive):
         return False
     return not any(
         _drive_pool_reference_matches(drive, pool_reference)
         for pool_reference in pool_references
     )
+
+
+def _drive_stable_pool_reference_values(drive: dict[str, Any]) -> set[str]:
+    """Return stable pool reference values declared by a drive."""
+    values = {_text(drive.get(key)) for key in DRIVE_STABLE_POOL_REFERENCE_KEYS}
+
+    pool = drive.get("pool")
+    if isinstance(pool, dict):
+        values.update(_text(pool.get(key)) for key in POOL_STABLE_REFERENCE_KEYS)
+
+    return {value for value in values if value}
 
 
 def _append_unique_drive(drives: list[dict[str, Any]], drive: dict[str, Any]) -> None:
@@ -387,7 +433,7 @@ def _merge_drive_entries(
         current = merged.get(key)
         if isinstance(current, dict) and isinstance(value, dict):
             merged[key] = _merge_drive_entries(current, value)
-        elif not _is_missing_drive_value(value):
+        elif _is_missing_drive_value(current) and not _is_missing_drive_value(value):
             merged[key] = value
         elif key not in merged:
             merged[key] = value
@@ -518,6 +564,7 @@ def _collect_nested_raid_drives(pool: dict[str, Any]) -> list[dict[str, Any]]:
 def _collect_global_reference_drives(pool: dict[str, Any]) -> list[dict[str, Any]]:
     """Collect drives from global pool refs for this pool."""
     pool_references = _pool_reference_values(pool)
+    pool_stable_references = _pool_stable_reference_values(pool)
     global_disks = pool.get("__global_disks")
     if not pool_references or not isinstance(global_disks, list):
         return []
@@ -525,6 +572,10 @@ def _collect_global_reference_drives(pool: dict[str, Any]) -> list[dict[str, Any
     matched: list[dict[str, Any]] = []
     for disk in global_disks:
         if not isinstance(disk, dict):
+            continue
+        if _drive_references_foreign_pool(
+            disk, pool_references, pool_stable_references
+        ):
             continue
         if any(
             _drive_pool_reference_matches(disk, pool_reference)
@@ -540,6 +591,8 @@ def _collect_raid_group_reference_drives(pool: dict[str, Any]) -> list[dict[str,
     if not isinstance(global_disks, list):
         return []
 
+    pool_references = _pool_reference_values(pool)
+    pool_stable_references = _pool_stable_reference_values(pool)
     active_raid_group_id = _text(pool.get("activeRaidGroupId")) or _text(
         pool.get("active_raid_group_id")
     )
@@ -549,6 +602,10 @@ def _collect_raid_group_reference_drives(pool: dict[str, Any]) -> list[dict[str,
     drives: list[dict[str, Any]] = []
     for disk in global_disks:
         if not isinstance(disk, dict):
+            continue
+        if _drive_references_foreign_pool(
+            disk, pool_references, pool_stable_references
+        ):
             continue
         if _disk_references_active_raid_group(disk, active_raid_group_id):
             drives.append(disk)
@@ -634,6 +691,15 @@ def _pool_reference_values(pool: dict[str, Any]) -> list[str]:
         if value and value not in values:
             values.append(value)
     return values
+
+
+def _pool_stable_reference_values(pool: dict[str, Any]) -> set[str]:
+    """Return stable identifiers that global disks may use for a pool."""
+    return {
+        value
+        for key in POOL_STABLE_REFERENCE_KEYS
+        if (value := _text(pool.get(key)))
+    }
 
 
 def _collect_drive_like_dicts(value: Any) -> list[dict[str, Any]]:

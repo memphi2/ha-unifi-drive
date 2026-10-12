@@ -1057,6 +1057,46 @@ def test_storage_drive_extraction_preserves_local_metrics_when_completing_global
     assert sensor_module._drive_health(drives[0]) == "optimal"
 
 
+def test_storage_drive_extraction_preserves_current_global_metrics() -> None:
+    """Global completion should not overwrite current global metrics with stale local data."""
+    payload = {
+        "pools": [
+            {
+                "id": "pool-a",
+                "label": "Primary",
+                "driveCount": 2,
+                "drives": [
+                    {
+                        "serial": "disk-1",
+                        "temperature": 31,
+                        "status": "healthy",
+                    }
+                ],
+            }
+        ],
+        "disks": [
+            {
+                "serial": "disk-1",
+                "poolId": "pool-a",
+                "temperature": 40,
+                "status": "failed",
+            },
+            {
+                "serial": "disk-2",
+                "poolId": "pool-a",
+                "temperature": 32,
+            },
+        ],
+    }
+
+    pools = sensor_module._pools(payload)
+    drives = sensor_module._pool_drives(pools[0])
+
+    disk_1 = next(drive for drive in drives if drive.get("serial") == "disk-1")
+    assert sensor_module._drive_temperature(disk_1) == 40.0
+    assert sensor_module._drive_health(disk_1) == "at_risk"
+
+
 def test_storage_drive_extraction_ignores_non_unique_display_names() -> None:
     """Drive display names should not collapse global identity matching."""
     payload = {
@@ -1207,6 +1247,31 @@ def test_storage_drive_extraction_rejects_known_foreign_pool_members() -> None:
     }
 
 
+def test_storage_drive_extraction_rejects_conflicting_stable_pool_refs() -> None:
+    """Stable pool reference conflicts should override weak name matches."""
+    payload = {
+        "pools": [
+            {
+                "id": "pool-a",
+                "label": "Primary",
+                "driveCount": 1,
+            }
+        ],
+        "disks": [
+            {
+                "serial": "foreign-disk",
+                "poolId": "pool-b",
+                "poolName": "Primary",
+                "temperature": 42,
+            }
+        ],
+    }
+
+    pools = sensor_module._pools(payload)
+
+    assert sensor_module._pool_drives(pools[0]) == []
+
+
 def test_storage_drive_extraction_rejects_foreign_raid_group_candidates() -> None:
     """Foreign raid-group disks should not be guessed into a single pool."""
     payload = {
@@ -1290,6 +1355,43 @@ def test_storage_drive_extraction_matches_compatible_identity_fields() -> None:
     assert {drive.get("serial") for drive in drives} == {"serial-a", "serial-b"}
     serial_a = next(drive for drive in drives if drive.get("serial") == "serial-a")
     assert sensor_module._drive_temperature(serial_a) == 31.0
+
+
+def test_storage_drive_extraction_keeps_serial_match_across_id_aliases() -> None:
+    """Different stable-id aliases should not block an exact serial match."""
+    payload = {
+        "pools": [
+            {
+                "id": "pool-a",
+                "label": "Primary",
+                "driveCount": 2,
+                "drives": [
+                    {
+                        "uuid": "local-uuid",
+                        "serial": "disk-1",
+                        "temperature": 31,
+                    }
+                ],
+            }
+        ],
+        "disks": [
+            {
+                "id": "global-id",
+                "serial": "disk-1",
+                "poolId": "pool-a",
+            },
+            {
+                "serial": "disk-2",
+                "poolId": "pool-a",
+            },
+        ],
+    }
+
+    pools = sensor_module._pools(payload)
+    drives = sensor_module._pool_drives(pools[0])
+
+    disk_1 = next(drive for drive in drives if drive.get("serial") == "disk-1")
+    assert sensor_module._drive_temperature(disk_1) == 31.0
 
 
 def test_storage_drive_extraction_rejects_slot_match_with_serial_conflict() -> None:
