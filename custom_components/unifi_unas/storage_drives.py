@@ -670,7 +670,7 @@ def _reference_groups_from_keys(
     groups: dict[str, set[str]] = {}
     for group, keys in key_groups:
         values = {
-            value
+            _normalized_token(value)
             for key in keys
             if (value := _text(data.get(key)))
         }

@@ -1297,6 +1297,36 @@ def test_storage_drive_extraction_keeps_pool_reference_groups_separate() -> None
     assert sensor_module._pool_drives(pools[0]) == []
 
 
+def test_storage_drive_extraction_normalizes_pool_reference_values() -> None:
+    """Equivalent pool references should match across case and formatting."""
+    payload = {
+        "pools": [
+            {
+                "id": "POOL-A",
+                "driveCount": 2,
+            }
+        ],
+        "disks": [
+            {
+                "serial": "disk-1",
+                "poolId": "pool-a",
+                "temperature": 31,
+            },
+            {
+                "serial": "disk-2",
+                "poolId": "pool-a",
+                "temperature": 32,
+            },
+        ],
+    }
+
+    pools = sensor_module._pools(payload)
+    drives = sensor_module._pool_drives(pools[0])
+
+    assert len(drives) == 2
+    assert {drive.get("serial") for drive in drives} == {"disk-1", "disk-2"}
+
+
 def test_storage_drive_extraction_rejects_foreign_raid_group_candidates() -> None:
     """Foreign raid-group disks should not be guessed into a single pool."""
     payload = {
