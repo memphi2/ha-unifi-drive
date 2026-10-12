@@ -1272,6 +1272,31 @@ def test_storage_drive_extraction_rejects_conflicting_stable_pool_refs() -> None
     assert sensor_module._pool_drives(pools[0]) == []
 
 
+def test_storage_drive_extraction_keeps_pool_reference_groups_separate() -> None:
+    """Pool IDs should not match unrelated RAID-group identifiers."""
+    payload = {
+        "pools": [
+            {
+                "id": "pool-a",
+                "activeRaidGroupId": "foreign-pool-id",
+                "driveCount": 1,
+            }
+        ],
+        "disks": [
+            {
+                "serial": "foreign-disk",
+                "poolId": "foreign-pool-id",
+                "raidGroupId": "raid-b",
+                "temperature": 42,
+            }
+        ],
+    }
+
+    pools = sensor_module._pools(payload)
+
+    assert sensor_module._pool_drives(pools[0]) == []
+
+
 def test_storage_drive_extraction_rejects_foreign_raid_group_candidates() -> None:
     """Foreign raid-group disks should not be guessed into a single pool."""
     payload = {
