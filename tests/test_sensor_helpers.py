@@ -1327,6 +1327,42 @@ def test_storage_drive_extraction_normalizes_pool_reference_values() -> None:
     assert {drive.get("serial") for drive in drives} == {"disk-1", "disk-2"}
 
 
+def test_storage_drive_extraction_allows_uncomparable_reference_fallback() -> None:
+    """Uncomparable explicit references should not block single-pool completion."""
+    payload = {
+        "pools": [
+            {
+                "id": "pool-a",
+                "driveCount": 2,
+                "drives": [
+                    {
+                        "serial": "disk-1",
+                        "temperature": 31,
+                    }
+                ],
+            }
+        ],
+        "disks": [
+            {
+                "serial": "disk-1",
+                "raidGroupId": "rg-a",
+            },
+            {
+                "serial": "disk-2",
+                "raidGroupId": "rg-a",
+            },
+        ],
+    }
+
+    pools = sensor_module._pools(payload)
+    drives = sensor_module._pool_drives(pools[0])
+
+    assert len(drives) == 2
+    assert {drive.get("serial") for drive in drives} == {"disk-1", "disk-2"}
+    disk_1 = next(drive for drive in drives if drive.get("serial") == "disk-1")
+    assert sensor_module._drive_temperature(disk_1) == 31.0
+
+
 def test_storage_drive_extraction_rejects_foreign_raid_group_candidates() -> None:
     """Foreign raid-group disks should not be guessed into a single pool."""
     payload = {

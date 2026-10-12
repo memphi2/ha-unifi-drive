@@ -400,7 +400,10 @@ def _global_pool_member_drives(
         if pool_references and _drive_pool_reference_matches(drive, pool_references):
             _append_unique_drive(members, drive)
             continue
-        if _drive_has_explicit_pool_reference(drive):
+        if (
+            _drive_has_explicit_pool_reference(drive)
+            and _drive_has_comparable_pool_reference(drive, pool_references)
+        ):
             continue
         _append_unique_drive(candidates, drive)
 
@@ -426,10 +429,7 @@ def _drive_references_foreign_pool(
         pool_values = pool_references.get(group)
         if drive_values and pool_values and not drive_values & pool_values:
             return True
-
-    if not _drive_has_explicit_pool_reference(drive):
-        return False
-    return not _drive_pool_reference_matches(drive, pool_references)
+    return False
 
 
 def _drive_pool_reference_groups(drive: dict[str, Any]) -> dict[str, set[str]]:
@@ -443,6 +443,13 @@ def _drive_pool_reference_groups(drive: dict[str, Any]) -> dict[str, set[str]]:
         )
 
     return groups
+
+
+def _drive_has_comparable_pool_reference(
+    drive: dict[str, Any], pool_references: dict[str, set[str]]
+) -> bool:
+    """Return whether a drive reference can be compared with this pool."""
+    return any(group in pool_references for group in _drive_pool_reference_groups(drive))
 
 
 def _merge_reference_groups(
