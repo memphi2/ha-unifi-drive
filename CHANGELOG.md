@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.8.8 - HA 2026.10 compatibility maintenance
+
+Patch development for the next `0.8.x` maintenance release:
+
+- Updates the current Home Assistant validation target to `2026.10.0`.
+- Aligns the `unifi-discovery` requirement minimum with the current Home
+  Assistant dependency line used by Hassfest.
+- Pins `pytest-homeassistant-custom-component` to the matching `0.13.371`
+  release so the current CI leg is dependency-resolvable.
+- Keeps the advertised HACS minimum line on Home Assistant `2024.8.0` with
+  Python `3.12` coverage.
+- Confirms the current platforms avoid the affected 2026.10 DeviceEntry,
+  OAuth2, Modbus and LLM deprecation paths.
+- Adds a repository guard that rejects the HA 2026.10 deprecated DeviceEntry
+  multi-entry shim properties if they reappear later.
+- Adds a tiny validation-engine compatibility shim so local schema code can use
+  `voluptuous` on older supported HA versions and `probatio` on HA `2026.10`
+  when the standalone `voluptuous` package is no longer installed.
+- Fixes another dynamic drive expansion payload shape where a single-pool UNAS
+  reports the new drive in the global disk list and updates Drive Count, but
+  the pool member list lags behind.
+
 ## v0.8.7 - Dynamic drive entity discovery
 
 Bug fix release for `v0.8.7`:

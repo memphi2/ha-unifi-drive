@@ -8,8 +8,6 @@ import re
 from typing import Any
 from urllib.parse import urlsplit
 
-import voluptuous as vol
-
 from homeassistant.const import (
     CONF_API_KEY,
     CONF_HOST,
@@ -42,6 +40,7 @@ from .const import (
     MAX_SCAN_INTERVAL,
     MIN_SCAN_INTERVAL,
 )
+from . import ha_validation as vol
 from .wake_on_lan import normalize_mac_address, validate_ipv4_address
 
 HOSTNAME_LABEL_RE = re.compile(

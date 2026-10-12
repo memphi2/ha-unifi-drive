@@ -6,8 +6,6 @@ from collections.abc import Awaitable, Callable, Sequence
 from datetime import time
 from typing import Any, Mapping, NotRequired, TypeAlias, TypedDict, cast
 
-import voluptuous as vol
-
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
@@ -66,6 +64,7 @@ from .snapshot_types import (
     snapshot_target_name,
     snapshot_target_type,
 )
+from . import ha_validation as vol
 from .wake_on_lan import WakeOnLanError, async_send_magic_packet
 
 ServiceHandler = Callable[[ServiceCall], Awaitable[None]]

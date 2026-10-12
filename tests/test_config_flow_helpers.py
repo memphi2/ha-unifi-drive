@@ -86,6 +86,7 @@ def _install_base_stubs() -> None:
     install_aiohttp_stub(include_cookie_jar=True)
 
     vol_pkg = types.ModuleType("voluptuous")
+    vol_pkg.Invalid = ValueError
     vol_pkg.Required = lambda key, default=None: key
     vol_pkg.Optional = lambda key, default=None: key
     vol_pkg.Schema = lambda schema: schema

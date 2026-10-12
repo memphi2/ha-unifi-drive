@@ -151,7 +151,8 @@ VALIDATE_WORKFLOW_HA_REQUIREMENT_PATTERN = re.compile(
 VALIDATE_WORKFLOW_PYTHON_PATTERN = re.compile(r"python:\s*[\"']?3\.14[\"']?")
 VALIDATE_WORKFLOW_MINIMUM_PYTHON_PATTERN = re.compile(r"python:\s*[\"']?3\.12[\"']?")
 RELEASE_WORKFLOW_PYTHON_PATTERN = re.compile(r"python-version:\s*[\"']?3\.14[\"']?")
-CURRENT_HOMEASSISTANT_TARGET = "2026.6.0"
+CURRENT_HOMEASSISTANT_TARGET = "2026.10.0"
+CURRENT_PYTEST_HOMEASSISTANT = "0.13.371"
 WORKFLOW_HOMEASSISTANT_MATRIX_PATTERN = re.compile(
     r"homeassistant:\s*[\"']([^\"']+)[\"']"
 )
@@ -159,6 +160,15 @@ CONFIG_FLOW_RELOAD_METHOD_PATTERNS = {
     "async_schedule_reload": re.compile(r"\.async_schedule_reload\("),
     "async_reload": re.compile(r"\.async_reload\("),
     "async_update_reload_and_abort": re.compile(r"\basync_update_reload_and_abort\("),
+}
+DEPRECATED_HOMEASSISTANT_API_PATTERNS = {
+    "DeviceEntry.primary_config_entry": re.compile(r"\bprimary_config_entry\b"),
+    "DeviceEntry.config_entries_subentries": re.compile(
+        r"\bconfig_entries_subentries\b"
+    ),
+    "DeviceEntry.config_entries": re.compile(
+        r"\b(?:device|device_entry)\.config_entries\b"
+    ),
 }
 
 EXPECTED_README_TITLE = "Home Assistant integration for UniFi Drive / UNAS (Unofficial)"
@@ -879,6 +889,20 @@ def check_config_flow_reload_methods() -> None:
     ok("Config-flow reload compatibility validated")
 
 
+def check_homeassistant_deprecation_guards() -> None:
+    """Reject Home Assistant APIs that are already deprecated for custom integrations."""
+    offenders: list[str] = []
+    for path in sorted(INTEGRATION_DIR.glob("*.py")):
+        content = path.read_text(encoding="utf-8")
+        for label, pattern in DEPRECATED_HOMEASSISTANT_API_PATTERNS.items():
+            if pattern.search(content):
+                offenders.append(f"{path.name}: {label}")
+
+    if offenders:
+        fail("Deprecated Home Assistant API usage found:\n" + "\n".join(offenders))
+    ok("Home Assistant deprecation guard validated")
+
+
 def check_workflow_action_versions() -> None:
     """Keep GitHub Actions workflows off deprecated Node.js 20 actions."""
     offenders: list[str] = []
@@ -935,8 +959,11 @@ def check_validate_workflow_homeassistant_target() -> None:
         missing.append(f"Home Assistant current target matrix leg {CURRENT_HOMEASSISTANT_TARGET}")
     if '"0.13.152"' not in workflow_text:
         missing.append("pytest-homeassistant-custom-component 0.13.152")
-    if '"0.13.334"' not in workflow_text:
-        missing.append("pytest-homeassistant-custom-component 0.13.334")
+    if f'"{CURRENT_PYTEST_HOMEASSISTANT}"' not in workflow_text:
+        missing.append(
+            "pytest-homeassistant-custom-component "
+            f"{CURRENT_PYTEST_HOMEASSISTANT}"
+        )
     if not VALIDATE_WORKFLOW_HA_REQUIREMENT_PATTERN.search(workflow_text):
         missing.append('"homeassistant==${{ matrix.homeassistant }}"')
     if "package_constraints.txt" not in workflow_text:
@@ -1202,6 +1229,7 @@ def main() -> None:
     check_quality_scale()
     check_coverage_gate()
     check_config_flow_reload_methods()
+    check_homeassistant_deprecation_guards()
     check_workflow_action_versions()
     check_workflow_python_versions()
     check_validate_workflow_homeassistant_target()
