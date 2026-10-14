@@ -210,10 +210,20 @@ def test_workflow_action_versions_reject_node20_actions(
         encoding="utf-8",
     )
     monkeypatch.setattr(module, "ROOT", tmp_path)
+    monkeypatch.setattr(module, "WORKFLOWS_DIR", tmp_path)
     monkeypatch.setattr(module, "VALIDATE_WORKFLOW_PATH", validate_workflow)
     monkeypatch.setattr(module, "RELEASE_WORKFLOW_PATH", release_workflow)
 
     module.check_workflow_action_versions()
+
+    # A workflow added later is covered too, not only the two named files.
+    (tmp_path / "extra.yaml").write_text(
+        "steps:\n  - uses: actions/stale@v9\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit):
+        module.check_workflow_action_versions()
+    (tmp_path / "extra.yaml").unlink()
 
     # A deprecated action is now named by the pin comment, not by the ref.
     validate_workflow.write_text(
