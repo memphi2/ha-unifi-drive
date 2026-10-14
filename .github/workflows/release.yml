@@ -18,10 +18,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.14"
           check-latest: true
@@ -49,7 +49,7 @@ jobs:
         run: python scripts/check_release_zip.py dist/unifi_unas.zip
 
       - name: Upload release ZIP artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: unifi_unas_release_zip
           path: dist/unifi_unas.zip
@@ -65,7 +65,7 @@ jobs:
           echo "body_path=$notes" >> "$GITHUB_OUTPUT"
 
       - name: Publish GitHub release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           files: dist/unifi_unas.zip
           body_path: ${{ steps.release_notes.outputs.body_path }}

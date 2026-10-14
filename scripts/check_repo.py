@@ -140,11 +140,17 @@ DEPRECATED_NODE20_WORKFLOW_ACTIONS = {
     "softprops/action-gh-release@v2": "softprops/action-gh-release@v3",
 }
 RELEASE_WORKFLOW_PRIVACY_MARKERS = (
-    "uses: actions/setup-python@v6",
+    "uses: actions/setup-python@",
     "python scripts/audit_github_public_surfaces.py --repo \"$GITHUB_REPOSITORY\"",
     "python scripts/check_repo.py",
     "python scripts/check_release_zip.py dist/unifi_unas.zip",
 )
+WORKFLOW_USES_PATTERN = re.compile(
+    r"^\s*(?:-\s+)?uses:\s*(?P<action>[^@\s]+)@(?P<ref>\S+)"
+    r"(?:\s+#\s*(?P<comment>\S+))?",
+    re.MULTILINE,
+)
+WORKFLOW_ACTION_SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 VALIDATE_WORKFLOW_HA_REQUIREMENT_PATTERN = re.compile(
     r"homeassistant==\$\{\{\s*matrix\.homeassistant\s*\}\}"
 )
@@ -906,21 +912,36 @@ def check_homeassistant_deprecation_guards() -> None:
 def check_workflow_action_versions() -> None:
     """Keep GitHub Actions workflows off deprecated Node.js 20 actions."""
     offenders: list[str] = []
+    unpinned: list[str] = []
     for workflow_path in (VALIDATE_WORKFLOW_PATH, RELEASE_WORKFLOW_PATH):
         workflow_text = workflow_path.read_text(encoding="utf-8")
-        for deprecated, replacement in DEPRECATED_NODE20_WORKFLOW_ACTIONS.items():
-            if re.search(rf"uses:\s*{re.escape(deprecated)}\b", workflow_text):
+        for match in WORKFLOW_USES_PATTERN.finditer(workflow_text):
+            action = match.group("action")
+            ref = match.group("ref")
+            where = workflow_path.relative_to(ROOT)
+            if not WORKFLOW_ACTION_SHA_PATTERN.match(ref):
+                unpinned.append(f"{where}: {action}@{ref} is not a commit SHA")
+                version = ref
+            else:
+                # A SHA says nothing about which release it is, so the version
+                # the deprecation table matches on lives in the pin comment.
+                version = match.group("comment")
+            replacement = DEPRECATED_NODE20_WORKFLOW_ACTIONS.get(f"{action}@{version}")
+            if replacement is not None:
                 offenders.append(
-                    f"{workflow_path.relative_to(ROOT)}: replace {deprecated} "
-                    f"with {replacement}"
+                    f"{where}: replace {action}@{version} with {replacement}"
                 )
 
+    if unpinned:
+        fail(
+            "GitHub Actions must be pinned to a commit SHA:\n" + "\n".join(unpinned)
+        )
     if offenders:
         fail(
             "Deprecated Node.js 20 GitHub Actions remain:\n"
             + "\n".join(offenders)
         )
-    ok("GitHub Actions Node.js runtime versions validated")
+    ok("GitHub Actions pins and Node.js runtime versions validated")
 
 
 def check_workflow_python_versions() -> None:
