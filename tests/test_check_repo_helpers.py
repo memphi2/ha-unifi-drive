@@ -193,19 +193,20 @@ def test_workflow_action_versions_reject_node20_actions(
 ) -> None:
     """Repository checks should reject workflow actions with Node.js 20 runtimes."""
     module = _load_check_repo_module()
+    pin = "0" * 40
     validate_workflow = tmp_path / "validate.yml"
     release_workflow = tmp_path / "release.yml"
     validate_workflow.write_text(
         "steps:\n"
-        "  - uses: actions/checkout@v6\n"
-        "  - uses: actions/setup-python@v6\n",
+        f"  - uses: actions/checkout@{pin} # v6\n"
+        f"  - uses: actions/setup-python@{pin} # v6\n",
         encoding="utf-8",
     )
     release_workflow.write_text(
         "steps:\n"
-        "  - uses: actions/checkout@v6\n"
-        "  - uses: actions/upload-artifact@v7\n"
-        "  - uses: softprops/action-gh-release@v3\n",
+        f"  - uses: actions/checkout@{pin} # v6\n"
+        f"  - uses: actions/upload-artifact@{pin} # v7\n"
+        f"  - uses: softprops/action-gh-release@{pin} # v3\n",
         encoding="utf-8",
     )
     monkeypatch.setattr(module, "ROOT", tmp_path)
@@ -214,8 +215,27 @@ def test_workflow_action_versions_reject_node20_actions(
 
     module.check_workflow_action_versions()
 
+    # A deprecated action is now named by the pin comment, not by the ref.
     validate_workflow.write_text(
-        "steps:\n  - uses: actions/checkout@v4\n",
+        f"steps:\n  - uses: actions/checkout@{pin} # v4\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit):
+        module.check_workflow_action_versions()
+
+    # An unpinned reference is rejected whatever version it names.
+    validate_workflow.write_text(
+        "steps:\n  - uses: actions/checkout@v6\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit):
+        module.check_workflow_action_versions()
+
+    # A pin without a readable release comment is rejected too: the comment is
+    # what the deprecation table matches on, so a missing one would hide a
+    # deprecated action behind an opaque SHA.
+    validate_workflow.write_text(
+        f"steps:\n  - uses: actions/checkout@{pin}\n",
         encoding="utf-8",
     )
     with pytest.raises(SystemExit):

@@ -151,6 +151,10 @@ WORKFLOW_USES_PATTERN = re.compile(
     re.MULTILINE,
 )
 WORKFLOW_ACTION_SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
+# A SHA pin carries its release in a trailing comment. The deprecation table
+# is matched against that comment, so an absent or malformed one would let a
+# deprecated action through unseen -- it is required, not decorative.
+WORKFLOW_ACTION_VERSION_PATTERN = re.compile(r"^(?:v\d+(?:\.\d+)*|main|master)$")
 VALIDATE_WORKFLOW_HA_REQUIREMENT_PATTERN = re.compile(
     r"homeassistant==\$\{\{\s*matrix\.homeassistant\s*\}\}"
 )
@@ -913,6 +917,7 @@ def check_workflow_action_versions() -> None:
     """Keep GitHub Actions workflows off deprecated Node.js 20 actions."""
     offenders: list[str] = []
     unpinned: list[str] = []
+    unlabelled: list[str] = []
     for workflow_path in (VALIDATE_WORKFLOW_PATH, RELEASE_WORKFLOW_PATH):
         workflow_text = workflow_path.read_text(encoding="utf-8")
         for match in WORKFLOW_USES_PATTERN.finditer(workflow_text):
@@ -921,11 +926,13 @@ def check_workflow_action_versions() -> None:
             where = workflow_path.relative_to(ROOT)
             if not WORKFLOW_ACTION_SHA_PATTERN.match(ref):
                 unpinned.append(f"{where}: {action}@{ref} is not a commit SHA")
-                version = ref
-            else:
-                # A SHA says nothing about which release it is, so the version
-                # the deprecation table matches on lives in the pin comment.
-                version = match.group("comment")
+                continue
+            version = match.group("comment")
+            if version is None or not WORKFLOW_ACTION_VERSION_PATTERN.match(version):
+                unlabelled.append(
+                    f"{where}: {action}@{ref[:12]} needs a '# <version>' comment"
+                )
+                continue
             replacement = DEPRECATED_NODE20_WORKFLOW_ACTIONS.get(f"{action}@{version}")
             if replacement is not None:
                 offenders.append(
@@ -935,6 +942,11 @@ def check_workflow_action_versions() -> None:
     if unpinned:
         fail(
             "GitHub Actions must be pinned to a commit SHA:\n" + "\n".join(unpinned)
+        )
+    if unlabelled:
+        fail(
+            "Pinned GitHub Actions must name their release in a comment:\n"
+            + "\n".join(unlabelled)
         )
     if offenders:
         fail(
