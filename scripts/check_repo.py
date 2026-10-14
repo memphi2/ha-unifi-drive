@@ -156,6 +156,14 @@ WORKFLOW_ACTION_SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 # is matched against that comment, so an absent or malformed one would let a
 # deprecated action through unseen -- it is required, not decorative.
 WORKFLOW_ACTION_VERSION_PATTERN = re.compile(r"^(?:v\d+(?:\.\d+)*|main|master)$")
+WORKFLOW_ACTION_MAJOR_PATTERN = re.compile(r"^(v\d+)")
+# Anything YAML reads as a "uses" key, in any spelling GitHub accepts. The
+# strict pattern above only reads the canonical one, so a line matched here but
+# not there is reported rather than skipped: the audit fails closed instead of
+# passing over a spelling it cannot parse.
+WORKFLOW_USES_KEY_PATTERN = re.compile(r"""^\s*(?:-\s+)?\{?\s*["']?uses["']?\s*:""")
+# Local and container actions are referenced by path or image, not by SHA.
+WORKFLOW_UNPINNABLE_USES_PATTERN = re.compile(r"^\s*(?:-\s+)?uses:\s*(?:\./|docker://)")
 VALIDATE_WORKFLOW_HA_REQUIREMENT_PATTERN = re.compile(
     r"homeassistant==\$\{\{\s*matrix\.homeassistant\s*\}\}"
 )
@@ -919,17 +927,27 @@ def check_workflow_action_versions() -> None:
     offenders: list[str] = []
     unpinned: list[str] = []
     unlabelled: list[str] = []
+    unreadable: list[str] = []
     # Every workflow, not just the two named ones: a pin rule that skips a
     # file added later would report success over an unchecked workflow.
     workflow_paths = sorted(
         path for path in WORKFLOWS_DIR.iterdir() if path.suffix in {".yml", ".yaml"}
     )
     for workflow_path in workflow_paths:
-        workflow_text = workflow_path.read_text(encoding="utf-8")
-        for match in WORKFLOW_USES_PATTERN.finditer(workflow_text):
+        where = workflow_path.relative_to(ROOT)
+        for line in workflow_path.read_text(encoding="utf-8").split("\n"):
+            if line.lstrip().startswith("#"):
+                continue
+            if not WORKFLOW_USES_KEY_PATTERN.match(line):
+                continue
+            if WORKFLOW_UNPINNABLE_USES_PATTERN.match(line):
+                continue
+            match = WORKFLOW_USES_PATTERN.match(line)
+            if match is None:
+                unreadable.append(f"{where}: cannot audit {line.strip()!r}")
+                continue
             action = match.group("action")
             ref = match.group("ref")
-            where = workflow_path.relative_to(ROOT)
             if not WORKFLOW_ACTION_SHA_PATTERN.match(ref):
                 unpinned.append(f"{where}: {action}@{ref} is not a commit SHA")
                 continue
@@ -939,12 +957,25 @@ def check_workflow_action_versions() -> None:
                     f"{where}: {action}@{ref[:12]} needs a '# <version>' comment"
                 )
                 continue
-            replacement = DEPRECATED_NODE20_WORKFLOW_ACTIONS.get(f"{action}@{version}")
-            if replacement is not None:
-                offenders.append(
-                    f"{where}: replace {action}@{version} with {replacement}"
-                )
+            # The table lists whole major lines, so a pin labelled v4.1.7 has to
+            # be matched on v4 as well or a deprecated release slips through.
+            candidates = [f"{action}@{version}"]
+            major = WORKFLOW_ACTION_MAJOR_PATTERN.match(version)
+            if major is not None:
+                candidates.append(f"{action}@{major.group(1)}")
+            for candidate in candidates:
+                replacement = DEPRECATED_NODE20_WORKFLOW_ACTIONS.get(candidate)
+                if replacement is not None:
+                    offenders.append(
+                        f"{where}: replace {candidate} with {replacement}"
+                    )
+                    break
 
+    if unreadable:
+        fail(
+            "GitHub Actions must be written as 'uses: <action>@<sha> # <version>':\n"
+            + "\n".join(unreadable)
+        )
     if unpinned:
         fail(
             "GitHub Actions must be pinned to a commit SHA:\n" + "\n".join(unpinned)

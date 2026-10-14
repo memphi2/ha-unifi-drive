@@ -251,6 +251,33 @@ def test_workflow_action_versions_reject_node20_actions(
     with pytest.raises(SystemExit):
         module.check_workflow_action_versions()
 
+    # A minor-level label still has to be matched against its major line, or a
+    # deprecated release passes by being spelled more precisely.
+    validate_workflow.write_text(
+        f"steps:\n  - uses: actions/checkout@{pin} # v4.1.7\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit):
+        module.check_workflow_action_versions()
+
+    # A "uses" key GitHub accepts but this audit cannot parse is reported, not
+    # skipped: an unreadable spelling must not become a silent bypass.
+    validate_workflow.write_text(
+        "steps:\n  - uses : actions/checkout@v6\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit):
+        module.check_workflow_action_versions()
+
+    # Local and container actions carry no SHA and are exempt.
+    validate_workflow.write_text(
+        "steps:\n"
+        "  - uses: ./.github/actions/setup\n"
+        f"  - uses: actions/checkout@{pin} # v6\n",
+        encoding="utf-8",
+    )
+    module.check_workflow_action_versions()
+
 
 def test_workflow_python_versions_require_compatibility_matrix(
     tmp_path,
