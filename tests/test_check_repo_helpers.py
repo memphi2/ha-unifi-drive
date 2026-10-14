@@ -251,6 +251,54 @@ def test_workflow_action_versions_reject_node20_actions(
     with pytest.raises(SystemExit):
         module.check_workflow_action_versions()
 
+    # A minor-level label still has to be matched against its major line, or a
+    # deprecated release passes by being spelled more precisely.
+    validate_workflow.write_text(
+        f"steps:\n  - uses: actions/checkout@{pin} # v4.1.7\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit):
+        module.check_workflow_action_versions()
+
+    # A "uses" key GitHub accepts but this audit cannot parse is reported, not
+    # skipped: an unreadable spelling must not become a silent bypass.
+    validate_workflow.write_text(
+        "steps:\n  - uses : actions/checkout@v6\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit):
+        module.check_workflow_action_versions()
+
+    # Local and container actions carry no SHA and are exempt -- in every key
+    # spelling the detector accepts, not only the canonical one.
+    validate_workflow.write_text(
+        "steps:\n"
+        "  - uses: ./.github/actions/setup\n"
+        "  - uses : ../shared/action\n"
+        '  - "uses": docker://alpine:3\n'
+        f"  - uses: actions/checkout@{pin} # v6\n",
+        encoding="utf-8",
+    )
+    module.check_workflow_action_versions()
+
+    # A flow mapping that puts another key first still has to be seen; it is
+    # reported as unreadable rather than skipped.
+    validate_workflow.write_text(
+        "steps:\n  - {name: Checkout, uses: actions/checkout@v4}\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(SystemExit):
+        module.check_workflow_action_versions()
+
+    # Prose inside a run step is not a key and must not trip the audit.
+    validate_workflow.write_text(
+        "steps:\n"
+        f"  - uses: actions/checkout@{pin} # v6\n"
+        '  - run: echo "the build uses: a pinned action"\n',
+        encoding="utf-8",
+    )
+    module.check_workflow_action_versions()
+
 
 def test_workflow_python_versions_require_compatibility_matrix(
     tmp_path,

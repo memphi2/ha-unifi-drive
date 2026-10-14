@@ -146,16 +146,28 @@ RELEASE_WORKFLOW_PRIVACY_MARKERS = (
     "python scripts/check_repo.py",
     "python scripts/check_release_zip.py dist/unifi_unas.zip",
 )
-WORKFLOW_USES_PATTERN = re.compile(
-    r"^\s*(?:-\s+)?uses:\s*(?P<action>[^@\s]+)@(?P<ref>\S+)"
-    r"(?:\s+#\s*(?P<comment>\S+))?",
-    re.MULTILINE,
-)
 WORKFLOW_ACTION_SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 # A SHA pin carries its release in a trailing comment. The deprecation table
 # is matched against that comment, so an absent or malformed one would let a
 # deprecated action through unseen -- it is required, not decorative.
 WORKFLOW_ACTION_VERSION_PATTERN = re.compile(r"^(?:v\d+(?:\.\d+)*|main|master)$")
+WORKFLOW_ACTION_MAJOR_PATTERN = re.compile(r"^(v\d+)")
+# Any spelling GitHub honours for a "uses" key: block style, a quoted key, extra
+# space before the colon, or a flow mapping where uses is not the first entry.
+WORKFLOW_USES_BLOCK_KEY_PATTERN = re.compile(r"""^(?:-\s+)?\{?\s*["']?uses["']?\s*:""")
+WORKFLOW_USES_FLOW_KEY_PATTERN = re.compile(r"""[{,]\s*["']?uses["']?\s*:""")
+WORKFLOW_USES_VALUE_PATTERN = re.compile(
+    r"""["']?uses["']?\s*:\s*["']?(?P<value>[^\s,}"']+)"""
+)
+# Local and container actions are referenced by path or image, never by SHA, so
+# they are exempt -- in every key spelling the detector accepts, not just one.
+WORKFLOW_UNPINNABLE_USES_PREFIXES = ("./", "../", ".\\", "docker://")
+# The one spelling this audit reads in full, because only here can it tell which
+# release a SHA belongs to. Anything else is reported, never skipped.
+WORKFLOW_CANONICAL_USES_PATTERN = re.compile(
+    r"^\s*(?:-\s+)?uses:\s*(?P<action>[^@\s]+)@(?P<ref>\S+)"
+    r"(?:\s+#\s*(?P<comment>\S+).*)?$"
+)
 VALIDATE_WORKFLOW_HA_REQUIREMENT_PATTERN = re.compile(
     r"homeassistant==\$\{\{\s*matrix\.homeassistant\s*\}\}"
 )
@@ -914,22 +926,52 @@ def check_homeassistant_deprecation_guards() -> None:
     ok("Home Assistant deprecation guard validated")
 
 
+def _declares_uses_key(line: str) -> bool:
+    """Return whether the line declares a `uses` key GitHub would honour.
+
+    Prose and run-step text are not keys, so a match is tied to a position a key
+    can occupy: the start of a block entry, or after `{` or `,` inside a flow
+    mapping on the same line.
+    """
+
+    stripped = line.lstrip()
+    if stripped.startswith("#"):
+        return False
+    if WORKFLOW_USES_BLOCK_KEY_PATTERN.match(stripped):
+        return True
+    return "{" in line and WORKFLOW_USES_FLOW_KEY_PATTERN.search(line) is not None
+
+
 def check_workflow_action_versions() -> None:
     """Keep GitHub Actions workflows off deprecated Node.js 20 actions."""
     offenders: list[str] = []
     unpinned: list[str] = []
     unlabelled: list[str] = []
+    unreadable: list[str] = []
     # Every workflow, not just the two named ones: a pin rule that skips a
     # file added later would report success over an unchecked workflow.
     workflow_paths = sorted(
         path for path in WORKFLOWS_DIR.iterdir() if path.suffix in {".yml", ".yaml"}
     )
     for workflow_path in workflow_paths:
-        workflow_text = workflow_path.read_text(encoding="utf-8")
-        for match in WORKFLOW_USES_PATTERN.finditer(workflow_text):
+        where = workflow_path.relative_to(ROOT)
+        for line in workflow_path.read_text(encoding="utf-8").split("\n"):
+            if not _declares_uses_key(line):
+                continue
+            values = [
+                found.group("value")
+                for found in WORKFLOW_USES_VALUE_PATTERN.finditer(line)
+            ]
+            if values and all(
+                value.startswith(WORKFLOW_UNPINNABLE_USES_PREFIXES) for value in values
+            ):
+                continue
+            match = WORKFLOW_CANONICAL_USES_PATTERN.match(line)
+            if match is None:
+                unreadable.append(f"{where}: cannot audit {line.strip()!r}")
+                continue
             action = match.group("action")
             ref = match.group("ref")
-            where = workflow_path.relative_to(ROOT)
             if not WORKFLOW_ACTION_SHA_PATTERN.match(ref):
                 unpinned.append(f"{where}: {action}@{ref} is not a commit SHA")
                 continue
@@ -939,12 +981,25 @@ def check_workflow_action_versions() -> None:
                     f"{where}: {action}@{ref[:12]} needs a '# <version>' comment"
                 )
                 continue
-            replacement = DEPRECATED_NODE20_WORKFLOW_ACTIONS.get(f"{action}@{version}")
-            if replacement is not None:
-                offenders.append(
-                    f"{where}: replace {action}@{version} with {replacement}"
-                )
+            # The table lists whole major lines, so a pin labelled v4.1.7 has to
+            # be matched on v4 as well or a deprecated release slips through.
+            candidates = [f"{action}@{version}"]
+            major = WORKFLOW_ACTION_MAJOR_PATTERN.match(version)
+            if major is not None:
+                candidates.append(f"{action}@{major.group(1)}")
+            for candidate in candidates:
+                replacement = DEPRECATED_NODE20_WORKFLOW_ACTIONS.get(candidate)
+                if replacement is not None:
+                    offenders.append(
+                        f"{where}: replace {candidate} with {replacement}"
+                    )
+                    break
 
+    if unreadable:
+        fail(
+            "GitHub Actions must be written as 'uses: <action>@<sha> # <version>':\n"
+            + "\n".join(unreadable)
+        )
     if unpinned:
         fail(
             "GitHub Actions must be pinned to a commit SHA:\n" + "\n".join(unpinned)
