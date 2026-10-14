@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "05:00"
+      timezone: "Europe/Berlin"
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "deps"
+
+# No pip entry on purpose. This repository commits no requirements file: the
+# workflows install Home Assistant from the validation matrix and resolve
+# everything else through that release's package_constraints.txt. The Python
+# versions therefore follow the matrix, and there is nothing here for Dependabot
+# to bump -- a pip entry would only report "no dependencies found".
