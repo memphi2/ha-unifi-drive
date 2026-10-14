@@ -146,24 +146,28 @@ RELEASE_WORKFLOW_PRIVACY_MARKERS = (
     "python scripts/check_repo.py",
     "python scripts/check_release_zip.py dist/unifi_unas.zip",
 )
-WORKFLOW_USES_PATTERN = re.compile(
-    r"^\s*(?:-\s+)?uses:\s*(?P<action>[^@\s]+)@(?P<ref>\S+)"
-    r"(?:\s+#\s*(?P<comment>\S+))?",
-    re.MULTILINE,
-)
 WORKFLOW_ACTION_SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 # A SHA pin carries its release in a trailing comment. The deprecation table
 # is matched against that comment, so an absent or malformed one would let a
 # deprecated action through unseen -- it is required, not decorative.
 WORKFLOW_ACTION_VERSION_PATTERN = re.compile(r"^(?:v\d+(?:\.\d+)*|main|master)$")
 WORKFLOW_ACTION_MAJOR_PATTERN = re.compile(r"^(v\d+)")
-# Anything YAML reads as a "uses" key, in any spelling GitHub accepts. The
-# strict pattern above only reads the canonical one, so a line matched here but
-# not there is reported rather than skipped: the audit fails closed instead of
-# passing over a spelling it cannot parse.
-WORKFLOW_USES_KEY_PATTERN = re.compile(r"""^\s*(?:-\s+)?\{?\s*["']?uses["']?\s*:""")
-# Local and container actions are referenced by path or image, not by SHA.
-WORKFLOW_UNPINNABLE_USES_PATTERN = re.compile(r"^\s*(?:-\s+)?uses:\s*(?:\./|docker://)")
+# Any spelling GitHub honours for a "uses" key: block style, a quoted key, extra
+# space before the colon, or a flow mapping where uses is not the first entry.
+WORKFLOW_USES_BLOCK_KEY_PATTERN = re.compile(r"""^(?:-\s+)?\{?\s*["']?uses["']?\s*:""")
+WORKFLOW_USES_FLOW_KEY_PATTERN = re.compile(r"""[{,]\s*["']?uses["']?\s*:""")
+WORKFLOW_USES_VALUE_PATTERN = re.compile(
+    r"""["']?uses["']?\s*:\s*["']?(?P<value>[^\s,}"']+)"""
+)
+# Local and container actions are referenced by path or image, never by SHA, so
+# they are exempt -- in every key spelling the detector accepts, not just one.
+WORKFLOW_UNPINNABLE_USES_PREFIXES = ("./", "../", ".\\", "docker://")
+# The one spelling this audit reads in full, because only here can it tell which
+# release a SHA belongs to. Anything else is reported, never skipped.
+WORKFLOW_CANONICAL_USES_PATTERN = re.compile(
+    r"^\s*(?:-\s+)?uses:\s*(?P<action>[^@\s]+)@(?P<ref>\S+)"
+    r"(?:\s+#\s*(?P<comment>\S+).*)?$"
+)
 VALIDATE_WORKFLOW_HA_REQUIREMENT_PATTERN = re.compile(
     r"homeassistant==\$\{\{\s*matrix\.homeassistant\s*\}\}"
 )
@@ -922,6 +926,22 @@ def check_homeassistant_deprecation_guards() -> None:
     ok("Home Assistant deprecation guard validated")
 
 
+def _declares_uses_key(line: str) -> bool:
+    """Return whether the line declares a `uses` key GitHub would honour.
+
+    Prose and run-step text are not keys, so a match is tied to a position a key
+    can occupy: the start of a block entry, or after `{` or `,` inside a flow
+    mapping on the same line.
+    """
+
+    stripped = line.lstrip()
+    if stripped.startswith("#"):
+        return False
+    if WORKFLOW_USES_BLOCK_KEY_PATTERN.match(stripped):
+        return True
+    return "{" in line and WORKFLOW_USES_FLOW_KEY_PATTERN.search(line) is not None
+
+
 def check_workflow_action_versions() -> None:
     """Keep GitHub Actions workflows off deprecated Node.js 20 actions."""
     offenders: list[str] = []
@@ -936,13 +956,17 @@ def check_workflow_action_versions() -> None:
     for workflow_path in workflow_paths:
         where = workflow_path.relative_to(ROOT)
         for line in workflow_path.read_text(encoding="utf-8").split("\n"):
-            if line.lstrip().startswith("#"):
+            if not _declares_uses_key(line):
                 continue
-            if not WORKFLOW_USES_KEY_PATTERN.match(line):
+            values = [
+                found.group("value")
+                for found in WORKFLOW_USES_VALUE_PATTERN.finditer(line)
+            ]
+            if values and all(
+                value.startswith(WORKFLOW_UNPINNABLE_USES_PREFIXES) for value in values
+            ):
                 continue
-            if WORKFLOW_UNPINNABLE_USES_PATTERN.match(line):
-                continue
-            match = WORKFLOW_USES_PATTERN.match(line)
+            match = WORKFLOW_CANONICAL_USES_PATTERN.match(line)
             if match is None:
                 unreadable.append(f"{where}: cannot audit {line.strip()!r}")
                 continue
