@@ -34,6 +34,7 @@ CONFIG_FLOW_PATH = INTEGRATION_DIR / "config_flow.py"
 PY_TYPED_PATH = INTEGRATION_DIR / "py.typed"
 COVERAGE_PATH = ROOT / ".coveragerc"
 MYPY_PATH = ROOT / "mypy.ini"
+WORKFLOWS_DIR = ROOT / ".github" / "workflows"
 VALIDATE_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "validate.yml"
 RELEASE_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "release.yml"
 RELEASE_ZIP_CHECK_PATH = ROOT / "scripts" / "check_release_zip.py"
@@ -918,7 +919,12 @@ def check_workflow_action_versions() -> None:
     offenders: list[str] = []
     unpinned: list[str] = []
     unlabelled: list[str] = []
-    for workflow_path in (VALIDATE_WORKFLOW_PATH, RELEASE_WORKFLOW_PATH):
+    # Every workflow, not just the two named ones: a pin rule that skips a
+    # file added later would report success over an unchecked workflow.
+    workflow_paths = sorted(
+        path for path in WORKFLOWS_DIR.iterdir() if path.suffix in {".yml", ".yaml"}
+    )
+    for workflow_path in workflow_paths:
         workflow_text = workflow_path.read_text(encoding="utf-8")
         for match in WORKFLOW_USES_PATTERN.finditer(workflow_text):
             action = match.group("action")
