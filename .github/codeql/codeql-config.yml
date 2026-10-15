@@ -1,0 +1,4 @@
+name: "UniFi Drive CodeQL config"
+
+paths-ignore:
+  - "docs/**"
