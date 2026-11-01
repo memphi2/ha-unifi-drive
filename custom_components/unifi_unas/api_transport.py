@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from aiohttp import ClientConnectorError, ClientError, ClientResponse, ClientSession
 
 from .api_errors import CannotConnect, InvalidAuth, UnexpectedResponse
-from .security import safe_error_text
+from .security import safe_response_summary
 
 _T = TypeVar("_T")
 
@@ -101,7 +101,7 @@ class ApiTransportMixin:
         """Perform a JSON request against the local console."""
         data = await self._request(method, path, expect_json=True)
         if not isinstance(data, dict):
-            raise UnexpectedResponse(f"Expected JSON object from {path}")
+            raise UnexpectedResponse("Expected a JSON object from the console")
         return data
 
     async def _request_no_json(self, method: str, path: str) -> None:
@@ -134,8 +134,8 @@ class ApiTransportMixin:
                 if response.status >= 400:
                     body = await response.text()
                     raise CannotConnect(
-                        f"Request to {path} failed with HTTP {response.status}: "
-                        f"{safe_error_text(body)}"
+                        f"Console request failed with HTTP {response.status}: "
+                        f"{safe_response_summary(body)}"
                     )
 
                 if not expect_json:
@@ -147,7 +147,7 @@ class ApiTransportMixin:
                 except JSONDecodeError as err:
                     body = await response.text()
                     raise UnexpectedResponse(
-                        f"Expected JSON from {path}, got: {safe_error_text(body)}"
+                        f"Expected JSON from the console, got: {safe_response_summary(body)}"
                     ) from err
 
             return data if isinstance(data, dict) else None

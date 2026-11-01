@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from .api_errors import InvalidAuth, UnexpectedResponse, UnsupportedFeature
 from .const import FAN_CONTROL_PATH, FAN_MODE_API_VALUES
-from .security import safe_error_text
+from .security import safe_response_summary
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -173,7 +173,7 @@ class ApiFanMixin:
             self._fan_mode_write_supported = False
         raise UnsupportedFeature(
             f"Native UniFi Drive fan-mode endpoint {FAN_CONTROL_PATH} returned "
-            f"HTTP {last_status}: {safe_error_text(last_response_payload)}"
+            f"HTTP {last_status}: {safe_response_summary(last_response_payload)}"
         )
 
     def _fan_mode_write_payloads(self, value: str) -> tuple[dict[str, Any], ...]:

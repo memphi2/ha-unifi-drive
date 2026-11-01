@@ -26,7 +26,7 @@ from .snapshot_paths import (
     _snapshot_settings_write_paths,
 )
 from .snapshot_inventory import extract_snapshot_inventory
-from .security import safe_error_text
+from .security import safe_response_summary
 # Re-export helper names from this legacy module path for tests and local callers.
 from .snapshot_payload import (
     _extract_snapshot_settings_from_list,
@@ -421,7 +421,7 @@ class ApiSnapshotMixin:
             )
         raise UnsupportedFeature(
             f"Snapshot inventory endpoint returned HTTP {status}: "
-            f"{safe_error_text(payload)}"
+            f"{safe_response_summary(payload)}"
         )
 
     async def _async_create_snapshot_once(
@@ -458,7 +458,7 @@ class ApiSnapshotMixin:
             )
         raise UnsupportedFeature(
             f"Manual snapshot endpoint returned HTTP {status}: "
-            f"{safe_error_text(response_payload)}"
+            f"{safe_response_summary(response_payload)}"
         )
 
     async def _async_update_snapshot_target_settings_once(
@@ -546,7 +546,7 @@ class ApiSnapshotMixin:
 
         raise UnsupportedFeature(
             f"Snapshot settings {last_method.lower()} endpoint returned HTTP "
-            f"{last_status}: {safe_error_text(last_payload)}"
+            f"{last_status}: {safe_response_summary(last_payload)}"
         )
 
     def _current_user_id(self) -> str | None:

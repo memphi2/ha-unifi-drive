@@ -11,7 +11,7 @@ from aiohttp import ClientResponse, ClientSession
 from .api_errors import CannotConnect, InvalidAuth
 from .api_transport import reject_redirect
 from .const import LOGIN_PATH
-from .security import safe_error_text
+from .security import safe_response_summary
 from .wake_on_lan import normalize_mac_address
 
 # Cookie name only, not a secret value.
@@ -271,7 +271,7 @@ class ApiAuthMixin:
         if response.status >= 400:
             body = await response.text()
             raise CannotConnect(
-                f"Login failed with HTTP {response.status}: {safe_error_text(body)}"
+                f"Login failed with HTTP {response.status}: {safe_response_summary(body)}"
             )
 
         try:

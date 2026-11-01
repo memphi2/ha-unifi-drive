@@ -27,7 +27,7 @@ _LOCAL_HOSTNAME_RE = re.compile(
 _KEY_VALUE_SECRET_RE = re.compile(
     r"(?ix)"
     r"((?:\"|')?"
-    r"(?:password|passwd|token|access_token|refresh_token|api[_-]?key|secret|"
+    r"(?:username|user_name|share|share_name|password|passwd|token|access_token|refresh_token|api[_-]?key|secret|"
     r"authorization|csrf|cookie|session|host|hostname|ip|ipaddress|ip_address|"
     r"mac|macaddress|mac_address|serial|serialnumber|serial_number|key)"
     r"(?:\"|')?\s*[:=]\s*)"
@@ -83,3 +83,16 @@ def safe_error_text(value: Any, *, limit: int = 500) -> str:
     if len(text) <= limit:
         return text
     return f"{text[:limit]}..."
+
+
+def safe_response_summary(value: object) -> str:
+    """Describe untrusted HTTP response bodies without exposing keys or values."""
+    if value is None:
+        return "empty response"
+    if isinstance(value, dict):
+        return f"object response ({len(value)} fields)"
+    if isinstance(value, list):
+        return f"array response ({len(value)} items)"
+    if isinstance(value, str):
+        return f"text response ({len(value)} characters)"
+    return "scalar response"

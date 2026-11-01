@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from .api_backup import BACKUP_NOT_FOUND_HTTP_STATUSES
 from .api_errors import InvalidAuth, UnsupportedFeature
 from .const import DRIVE_APPLICATION_UPDATE_PATH, UNIFI_OS_UPDATE_PATH
-from .security import safe_error_text
+from .security import safe_response_summary
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ class ApiUpdatesMixin:
             _LOGGER.debug(
                 "%s update endpoint reports no update needed (HTTP 409): %s",
                 name,
-                safe_error_text(response_payload),
+                safe_response_summary(response_payload),
             )
             return
 
@@ -80,5 +80,5 @@ class ApiUpdatesMixin:
             raise UnsupportedFeature(f"{name} update endpoint is not available.")
         raise UnsupportedFeature(
             f"{name} update endpoint {path} returned HTTP {status}: "
-            f"{safe_error_text(response_payload)}"
+            f"{safe_response_summary(response_payload)}"
         )

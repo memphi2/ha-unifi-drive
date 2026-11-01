@@ -7,7 +7,17 @@ import pytest
 from tests.api_client_stubs import UnifiUnasApiClient
 from aiohttp import ClientError
 from custom_components.unifi_unas.api import CannotConnect
-from custom_components.unifi_unas.security import safe_error_text
+from custom_components.unifi_unas.security import safe_error_text, safe_response_summary
+
+
+def test_response_summaries_expose_shape_only() -> None:
+    """Neither keys nor values of server responses belong in logs or repairs."""
+    assert safe_response_summary({"private-user": "private-share"}) == "object response (1 fields)"
+    assert safe_response_summary(["private-user"]) == "array response (1 items)"
+    assert safe_response_summary("private-host") == "text response (12 characters)"
+    assert safe_response_summary(None) == "empty response"
+    assert safe_response_summary(42) == "scalar response"
+    assert "private-user" not in safe_error_text('username="private-user"')
 
 
 def test_normalize_fan_mode_variants() -> None:

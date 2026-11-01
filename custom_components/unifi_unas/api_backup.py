@@ -6,7 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from .api_errors import InvalidAuth, UnexpectedResponse, UnsupportedFeature
-from .security import safe_error_text
+from .security import safe_response_summary
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -96,7 +96,7 @@ class ApiBackupMixin:
                 }:
                     _LOGGER.debug(
                         "Backup task returned unexpected payload data=%s",
-                        safe_error_text(data),
+                        safe_response_summary(data),
                     )
             return
 
@@ -106,7 +106,7 @@ class ApiBackupMixin:
             )
         raise UnsupportedFeature(
             f"Remote-backup task endpoint returned HTTP {status}: "
-            f"{safe_error_text(payload)}"
+            f"{safe_response_summary(payload)}"
         )
 
     @staticmethod

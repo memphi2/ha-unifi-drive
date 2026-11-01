@@ -197,6 +197,21 @@ def test_transport_raw_response_parses_json_text_and_empty_bodies() -> None:
     assert asyncio.run(client._request_raw("POST", "/three")) == (204, None)
 
 
+@pytest.mark.parametrize("body", [
+    '{"username":"private-user","share":"private-share"}',
+    "Request from private-console for private-user on private-share failed",
+    "<html><title>private-console</title>private-share</html>",
+])
+def test_transport_errors_never_include_untrusted_body_values(body: str) -> None:
+    """Regex redaction is not a safe boundary for arbitrary device error text."""
+    session = _Session()
+    session.request_responses.append(_Response(503, text=body))
+    with pytest.raises(CannotConnect) as error:
+        asyncio.run(_client(session)._request_json("GET", "/private-share"))
+    assert "HTTP 503" in str(error.value)
+    assert "private-" not in str(error.value)
+
+
 def test_transport_timeout_wrapper_sanitizes_aiohttp_errors() -> None:
     """Aiohttp client errors should be mapped without raw endpoint details."""
     client = _client(_Session())
