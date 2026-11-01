@@ -114,7 +114,9 @@ Versions before `0.8.0` must be removed and reinstalled; follow the
 Monitoring uses local polling with a minimum interval of 30 seconds. Optional
 polling shares a ten-second budget with time reserved for each enabled feature,
 so a slow endpoint cannot block later features or core updates indefinitely.
-Snapshot inventory normally refreshes every ten minutes.
+Snapshot inventory normally refreshes every ten minutes. Larger batches resume
+over subsequent polls without discarding completed target reads; interrupted
+targets do not prevent other targets from progressing.
 
 After two consecutive connection failures, `Device online` reports off and
 `System status` reports offline. Core monitoring sensors retain their last known

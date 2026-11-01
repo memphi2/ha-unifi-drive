@@ -999,8 +999,142 @@ def test_cancelled_snapshot_inventory_keeps_refresh_request() -> None:
             pass
         else:
             raise AssertionError("Cancellation must propagate")
-        assert coordinator._snapshot_inventory_refresh_requested
+        assert coordinator._snapshot_inventory_pending_targets is not None
+        assert coordinator._snapshot_inventory_refresh_due(coordinator_module.datetime.now(coordinator_module.UTC))
         assert coordinator._snapshot_inventory_last_refresh is None
+
+    asyncio.run(run())
+
+
+def test_snapshot_inventory_resumes_multi_target_batches_after_budget_expires(monkeypatch) -> None:
+    """Aggregate latency may exceed one poll without dropping completed target reads."""
+    monkeypatch.setattr(coordinator_module, "_OPTIONAL_REFRESH_TIMEOUT", 0.05)
+
+    class Client(_FakePollingInventoryClient):
+        def __init__(self):
+            super().__init__()
+            self.snapshot_settings = [{"id": name, "type": "shared"} for name in ("a", "b", "c")]
+            self.completed = []
+            self.active = 0
+            self.delay = 0.03
+
+        async def async_get_snapshot_inventory_target(self, target):
+            self.inventory_calls.append(target["id"])
+            self.active += 1
+            try:
+                await asyncio.sleep(self.delay)
+                self.completed.append(target["id"])
+                return {"snapshot_count": len(self.completed)}
+            finally:
+                self.active -= 1
+
+    async def run():
+        client = Client()
+        coordinator = coordinator_module.UnifiUnasCoordinator(
+            types.SimpleNamespace(), client, _FakeSnapshotPollingEntry()
+        )
+        for _ in range(10):
+            assert await asyncio.wait_for(coordinator._async_update_data(), 1) == {
+                "_system": {"status": "online"}
+            }
+            assert client.active == 0
+            assert set(coordinator.snapshot_inventory) == {f"shared_{key}" for key in client.completed}
+            if coordinator._snapshot_inventory_pending_targets is None:
+                break
+        assert coordinator._snapshot_inventory_pending_targets is None
+        assert sorted(client.completed) == ["a", "b", "c"]
+        assert coordinator._snapshot_inventory_last_refresh is not None
+        assert coordinator.snapshot_inventory_errors == {}
+        calls = list(client.inventory_calls)
+        await coordinator._async_update_data()
+        assert client.inventory_calls == calls
+        client.delay = 0
+        coordinator.request_snapshot_inventory_refresh()
+        await coordinator._async_update_data()
+        assert sorted(client.completed) == ["a", "a", "b", "b", "c", "c"]
+
+    asyncio.run(run())
+
+
+def test_snapshot_inventory_stalled_target_does_not_starve_peers_or_survive_removal(monkeypatch) -> None:
+    """Rotate interrupted targets and reconcile the pending batch with new settings."""
+    monkeypatch.setattr(coordinator_module, "_OPTIONAL_REFRESH_TIMEOUT", 0.01)
+    read_statuses = []
+    monkeypatch.setattr(
+        coordinator_module, "async_update_snapshot_read_issue",
+        lambda *args, supported: read_statuses.append(supported),
+    )
+
+    class Client(_FakePollingInventoryClient):
+        async def async_get_snapshot_inventory_target(self, target):
+            self.inventory_calls.append(target["id"])
+            if target["id"] == "a":
+                await asyncio.Event().wait()
+            return {"snapshot_count": 1}
+
+    async def run():
+        client = Client()
+        client.snapshot_settings = [{"id": name, "type": "shared"} for name in ("a", "b", "c")]
+        coordinator = coordinator_module.UnifiUnasCoordinator(
+            types.SimpleNamespace(), client, _FakeSnapshotPollingEntry()
+        )
+        await coordinator._async_update_data()
+        assert read_statuses == [True]
+        assert list(coordinator._snapshot_inventory_pending_targets) == ["shared_b", "shared_c", "shared_a"]
+        await coordinator._async_update_data()
+        assert set(coordinator.snapshot_inventory) == {"shared_b", "shared_c"}
+        assert client.inventory_calls == ["a", "b", "c", "a"]
+        coordinator._snapshot_inventory_batch_started -= coordinator_module._SNAPSHOT_INVENTORY_REFRESH_INTERVAL
+        await coordinator._async_update_data()
+        await coordinator._async_update_data()
+        assert client.inventory_calls.count("b") == client.inventory_calls.count("c") == 2
+        before_removal = list(client.inventory_calls)
+        client.snapshot_settings = [{"id": name, "type": "shared"} for name in ("b", "d")]
+        await coordinator._async_update_data()
+        assert client.inventory_calls == [*before_removal, "d"]
+        assert set(coordinator.snapshot_inventory) == {"shared_b", "shared_d"}
+        assert coordinator._snapshot_inventory_pending_targets is None
+        coordinator.snapshot_buttons_enabled = False
+        await coordinator._async_update_data()
+        assert coordinator.snapshot_inventory == {}
+        assert coordinator._snapshot_inventory_pending_targets is None
+
+    asyncio.run(run())
+
+
+def test_snapshot_inventory_preserves_new_request_across_partial_batch() -> None:
+    """A write request during a cancelled batch must requeue completed targets."""
+    class Client(_FakePollingInventoryClient):
+        interrupted = False
+        callback = None
+
+        async def async_get_snapshot_inventory_target(self, target):
+            self.inventory_calls.append(target["id"])
+            if target["id"] == "b" and not self.interrupted:
+                self.interrupted = True
+                self.callback()
+                raise asyncio.CancelledError
+            return {"snapshot_count": len(self.inventory_calls)}
+
+    async def run():
+        client = Client()
+        client.snapshot_settings = [{"id": name, "type": "shared"} for name in ("a", "b")]
+        coordinator = coordinator_module.UnifiUnasCoordinator(
+            types.SimpleNamespace(), client, _FakeSnapshotPollingEntry()
+        )
+        client.callback = coordinator.request_snapshot_inventory_refresh
+        with pytest.raises(asyncio.CancelledError):
+            await coordinator._refresh_snapshot_settings()
+        assert coordinator.snapshot_inventory == {"shared_a": {"snapshot_count": 1}}
+        assert coordinator._snapshot_inventory_refresh_requested
+        await coordinator._refresh_snapshot_settings()
+        assert client.inventory_calls == ["a", "b", "b", "a"]
+        assert not coordinator._snapshot_inventory_refresh_requested
+        assert coordinator.snapshot_inventory == {
+            "shared_a": {"snapshot_count": 4}, "shared_b": {"snapshot_count": 3},
+        }
+        await coordinator._refresh_snapshot_settings()
+        assert client.inventory_calls == ["a", "b", "b", "a"]
 
     asyncio.run(run())
 

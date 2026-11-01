@@ -97,6 +97,8 @@ class UnifiUnasCoordinator(DataUpdateCoordinator[dict[str, Any]]):  # type: igno
         self._snapshot_inventory_last_refresh: datetime | None = None
         self._snapshot_inventory_refresh_requested = False
         self._snapshot_inventory_target_keys: set[str] = set()
+        self._snapshot_inventory_pending_targets: dict[str, None] | None = None
+        self._snapshot_inventory_batch_started: datetime | None = None
         self._first_refresh_core_only = False
         self._optional_refresh_lock = asyncio.Lock()
         self._optional_refresh_timed_out = False
@@ -286,12 +288,12 @@ class UnifiUnasCoordinator(DataUpdateCoordinator[dict[str, Any]]):  # type: igno
             async_update_snapshot_read_issue(self.hass, self.config_entry, supported=False)
             return
         self.snapshot_settings = settings
-        await self._async_refresh_snapshot_inventory_if_due()
         async_update_snapshot_read_issue(
             self.hass,
             self.config_entry,
             supported=self.client.snapshot_settings_read_supported,
         )
+        await self._async_refresh_snapshot_inventory_if_due()
 
     def _clear_snapshot_settings_state(self, *, clear_issues: bool = True) -> None:
         """Clear cached snapshot state and optionally clear snapshot repairs."""
@@ -303,6 +305,8 @@ class UnifiUnasCoordinator(DataUpdateCoordinator[dict[str, Any]]):  # type: igno
         self._snapshot_inventory_target_keys = set()
         self._snapshot_inventory_last_refresh = None
         self._snapshot_inventory_refresh_requested = False
+        self._snapshot_inventory_pending_targets = None
+        self._snapshot_inventory_batch_started = None
         if clear_issues:
             async_clear_snapshot_issues(self.hass, self.config_entry)
 
@@ -314,7 +318,16 @@ class UnifiUnasCoordinator(DataUpdateCoordinator[dict[str, Any]]):  # type: igno
         """Refresh snapshot inventory on a slower cadence than storage polling."""
         active_target_keys = self._snapshot_inventory_active_target_keys()
         if active_target_keys != self._snapshot_inventory_target_keys:
-            self._snapshot_inventory_refresh_requested = True
+            if self._snapshot_inventory_pending_targets is None:
+                self._snapshot_inventory_refresh_requested = True
+            else:
+                self._snapshot_inventory_pending_targets = {
+                    key: None for key in self._snapshot_inventory_pending_targets
+                    if key in active_target_keys
+                }
+                self._snapshot_inventory_pending_targets.update(dict.fromkeys(
+                    sorted(active_target_keys - self._snapshot_inventory_target_keys)
+                ))
             self._snapshot_inventory_target_keys = active_target_keys
 
         self._prune_snapshot_inventory_state(active_target_keys)
@@ -323,14 +336,25 @@ class UnifiUnasCoordinator(DataUpdateCoordinator[dict[str, Any]]):  # type: igno
             return
 
         refresh_requested = self._snapshot_inventory_refresh_requested
-        if refresh_requested:
+        batch_expired = (
+            self._snapshot_inventory_batch_started is not None
+            and now - self._snapshot_inventory_batch_started >= _SNAPSHOT_INVENTORY_REFRESH_INTERVAL
+        )
+        if self._snapshot_inventory_pending_targets is None:
             self._snapshot_inventory_refresh_requested = False
+            self._snapshot_inventory_pending_targets = dict.fromkeys(sorted(active_target_keys))
+            self._snapshot_inventory_batch_started = now
+        elif refresh_requested or batch_expired:
+            # Revisit completed targets after writes or a full cadence, even if a peer stalls.
+            for key in sorted(active_target_keys):
+                self._snapshot_inventory_pending_targets.setdefault(key, None)
+            self._snapshot_inventory_refresh_requested = False
+            self._snapshot_inventory_batch_started = now
         try:
             self.snapshot_inventory = await self._async_get_snapshot_inventory(active_target_keys)
-        except asyncio.CancelledError:
-            self._snapshot_inventory_refresh_requested = True
-            raise
         except (RuntimeError, TypeError, ValueError) as err:
+            self._snapshot_inventory_pending_targets = None
+            self._snapshot_inventory_batch_started = None
             if refresh_requested:
                 self._snapshot_inventory_refresh_requested = True
             _LOGGER.debug(
@@ -340,11 +364,16 @@ class UnifiUnasCoordinator(DataUpdateCoordinator[dict[str, Any]]):  # type: igno
             self._snapshot_inventory_last_refresh = now
             return
 
-        self._snapshot_inventory_last_refresh = now
+        self._snapshot_inventory_pending_targets = None
+        self._snapshot_inventory_batch_started = None
+        self._snapshot_inventory_last_refresh = datetime.now(UTC)
 
     def _snapshot_inventory_refresh_due(self, now: datetime) -> bool:
         """Return whether snapshot inventory should be read now."""
-        if self._snapshot_inventory_refresh_requested:
+        if (
+            self._snapshot_inventory_refresh_requested
+            or self._snapshot_inventory_pending_targets is not None
+        ):
             return True
         if self._snapshot_inventory_last_refresh is None:
             return True
@@ -387,57 +416,78 @@ class UnifiUnasCoordinator(DataUpdateCoordinator[dict[str, Any]]):  # type: igno
         """Return inventory summaries keyed by stable snapshot target key."""
         if active_target_keys is None:
             active_target_keys = self._snapshot_inventory_active_target_keys()
-        inventory: dict[str, dict[str, Any]] = {}
-        inventory_errors: dict[str, str] = {}
+        pending = self._snapshot_inventory_pending_targets
+        inventory = dict(self.snapshot_inventory) if pending is not None else {}
+        inventory_errors = dict(self.snapshot_inventory_errors) if pending is not None else {}
         snapshot_inventory_supported_by_type = _snapshot_inventory_type_support_map(
             self.client
         )
-        for target in self.snapshot_settings:
-            if not isinstance(target, dict):
+        targets: dict[str, dict[str, Any]] = {}
+        for raw_target in self.snapshot_settings:
+            if not isinstance(raw_target, dict):
                 continue
-            target_key = snapshot_target_key(target)
-            if not target_key:
-                continue
-            if skip_reason := self.snapshot_inventory_skip_reasons.get(target_key):
-                inventory_errors[target_key] = skip_reason
+            target_key = snapshot_target_key(raw_target)
+            if target_key and target_key in active_target_keys:
+                targets[target_key] = raw_target
+
+        for target_key in tuple(pending) if pending is not None else targets:
+            target = targets.get(target_key)
+            if target is None:
+                if pending is not None:
+                    pending.pop(target_key, None)
                 continue
             target_type = snapshot_target_type(target)
-            if _snapshot_inventory_type_is_unsupported(
+            if skip_reason := self.snapshot_inventory_skip_reasons.get(target_key):
+                inventory_errors[target_key] = skip_reason
+            elif _snapshot_inventory_type_is_unsupported(
                 snapshot_inventory_supported_by_type,
                 target_type,
             ):
                 reason = SNAPSHOT_INVENTORY_REASON_UNSUPPORTED
                 inventory_errors[target_key] = reason
                 self.snapshot_inventory_skip_reasons[target_key] = reason
-                continue
-            try:
-                inventory[target_key] = (
-                    await self.client.async_get_snapshot_inventory_target(target)
-                )
-                self.snapshot_inventory_skip_reasons.pop(target_key, None)
-            except (
-                CannotConnect,
-                InvalidAuth,
-                UnexpectedResponse,
-                UnsupportedFeature,
-            ) as err:
-                inventory_errors[target_key] = _snapshot_inventory_error_reason(err)
-                if _snapshot_inventory_read_should_be_skipped(err):
-                    self.snapshot_inventory_skip_reasons[target_key] = (
-                        inventory_errors[target_key]
+            else:
+                try:
+                    inventory[target_key] = (
+                        await self.client.async_get_snapshot_inventory_target(target)
                     )
-                _LOGGER.debug(
-                    "Could not read UniFi Drive snapshot inventory for %s: %s",
-                    target_type,
-                    safe_error_text(err),
-                )
-            except (RuntimeError, TypeError, ValueError) as err:
-                inventory_errors[target_key] = _snapshot_inventory_error_reason(err)
-                _LOGGER.debug(
-                    "Unexpectedly failed to read snapshot inventory for %s: %s",
-                    target_type,
-                    safe_error_text(err),
-                )
+                    inventory_errors.pop(target_key, None)
+                    self.snapshot_inventory_skip_reasons.pop(target_key, None)
+                except asyncio.CancelledError:
+                    if pending is not None:
+                        # Retry later without letting one stalled target starve its peers.
+                        pending.pop(target_key, None)
+                        pending[target_key] = None
+                    raise
+                except (
+                    CannotConnect,
+                    InvalidAuth,
+                    UnexpectedResponse,
+                    UnsupportedFeature,
+                ) as err:
+                    inventory_errors[target_key] = _snapshot_inventory_error_reason(err)
+                    if _snapshot_inventory_read_should_be_skipped(err):
+                        self.snapshot_inventory_skip_reasons[target_key] = (
+                            inventory_errors[target_key]
+                        )
+                    _LOGGER.debug(
+                        "Could not read UniFi Drive snapshot inventory for %s: %s",
+                        target_type,
+                        safe_error_text(err),
+                    )
+                except (RuntimeError, TypeError, ValueError) as err:
+                    inventory_errors[target_key] = _snapshot_inventory_error_reason(err)
+                    _LOGGER.debug(
+                        "Unexpectedly failed to read snapshot inventory for %s: %s",
+                        target_type,
+                        safe_error_text(err),
+                    )
+            if target_key in inventory_errors:
+                inventory.pop(target_key, None)
+            if pending is not None:
+                self.snapshot_inventory = inventory
+                self.snapshot_inventory_errors = inventory_errors
+                pending.pop(target_key, None)
         self.snapshot_inventory_skip_reasons = {
             target_key: reason
             for target_key, reason in self.snapshot_inventory_skip_reasons.items()
