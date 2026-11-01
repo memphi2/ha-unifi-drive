@@ -3,7 +3,7 @@
 [![Validate](https://github.com/memphi2/ha-unifi-drive/actions/workflows/validate.yml/badge.svg)](https://github.com/memphi2/ha-unifi-drive/actions/workflows/validate.yml)
 [![Quality](https://img.shields.io/badge/Quality-HA%20QS%20Platinum%20Track-0366d6?style=flat-square)](custom_components/unifi_unas/quality_scale.yaml)
 [![GitHub Release](https://img.shields.io/github/v/release/memphi2/ha-unifi-drive?display_name=tag&sort=semver&label=release)](https://github.com/memphi2/ha-unifi-drive/releases/latest)
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://www.hacs.xyz/)
+[![Marketplace](https://img.shields.io/badge/Home_Assistant-Marketplace-41BDF5?style=flat-square)](https://contributors.home-assistant.io/marketplace/)
 [![License MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Local Home Assistant custom integration for compatible UniFi Drive / UNAS
@@ -32,17 +32,17 @@ Home Assistant installations.
 
 ## Current Release
 
-- Current release line: `v0.8.8`
+- Integration version: `v0.8.9`
 - Home Assistant setup: UI config flow, discovery, manual setup, reauth,
   reconfigure and options flow
-- HACS type: custom integration
+- Distribution: Home Assistant Marketplace / HACS shared catalog
 - IoT class: local polling
 - Quality target: Bronze/Silver/Gold tracked as implemented, Platinum-track
   hardening in progress
-- Validation coverage: Home Assistant `2024.8.0` minimum and current
-  `2026.10.0` target line
-- Current maintenance focus: Home Assistant compatibility and robust dynamic
-  drive discovery during pool expansion
+- CI targets: Home Assistant `2024.8.0` minimum and `2026.10.0`;
+  November compatibility follow-up is tracked in [docs/lts.md](docs/lts.md)
+- Current maintenance focus: Home Assistant compatibility, device metadata and
+  Marketplace installation/update guidance
 
 This is a custom integration and does not claim official Home Assistant Core
 certification.
@@ -109,45 +109,56 @@ See [docs/firmware_matrix.md](docs/firmware_matrix.md) for the tracked evidence.
 ## Installation
 
 Versions before `0.8.0` should be removed and installed again instead of being
-upgraded in place.
+upgraded in place. Follow the [legacy upgrade checklist](docs/installation.md#upgrading-from-before-080).
 
-### HACS Custom Repository
+### Home Assistant Marketplace (recommended)
 
-1. Open HACS.
-2. Go to `Integrations`.
-3. Open the three-dot menu and choose `Custom repositories`.
-4. Add this repository URL:
+For Home Assistant `2026.11` and newer:
 
-   ```text
-   https://github.com/memphi2/ha-unifi-drive
-   ```
+1. Open `Settings` -> `Marketplace`.
+2. Search for `UniFi Drive` and open **UniFi Drive / UNAS** by **memphi2**.
+3. Install the integration and confirm the community-integration notice.
+4. Add **UniFi Drive / UNAS** from `Settings` -> `Devices & services` and
+   complete [First Setup](#first-setup).
 
-5. Select category `Integration`.
-6. Install `UniFi Drive / UNAS`.
-7. Restart Home Assistant.
-8. Add `UniFi Drive / UNAS` from `Settings` -> `Devices & services`.
+The repository is already in the shared catalog; no custom repository is
+needed. A first Marketplace install normally loads without a restart. Complete
+any restart requested by Home Assistant after an update or removal of loaded code.
+
+### HACS On Older Home Assistant Versions
+
+Before Home Assistant `2026.11`, search for **UniFi Drive / UNAS** in HACS,
+download it, restart Home Assistant and then add the integration from
+`Settings` -> `Devices & services`. No custom repository is needed here either.
 
 ### Manual Installation
 
-Copy the integration directory to:
-
-```text
-/config/custom_components/unifi_unas/
-```
-
-Then restart Home Assistant and add `UniFi Drive / UNAS` from the UI.
+For a deliberate manual installation, copy the selected release's
+`custom_components/unifi_unas/` directory into `/config/custom_components/`
+and restart Home Assistant. See the [installation guide](docs/installation.md#manual-installation)
+for the exact layout and update procedure.
 
 ### Nested Folder Recovery
 
-If the integration was installed one folder level too deep:
+`manifest.json` must be directly inside `/config/custom_components/unifi_unas/`,
+not inside a second `unifi_unas` directory. Follow the
+[folder recovery checklist](docs/installation.md#nested-folder-recovery) rather
+than deleting the configured device.
 
-```text
-/config/custom_components/unifi_unas/unifi_unas/
-```
+## Updates
 
-move the inner `unifi_unas` folder up to `/config/custom_components/` so the
-final path is `/config/custom_components/unifi_unas/`, then restart Home
-Assistant.
+Back up Home Assistant, read the release notes under `Settings` -> `Updates`,
+install the offered integration version and complete the restart request.
+On older Home Assistant versions, use the update offered by HACS.
+
+Keep working config entries when updating integration `0.8.0` or newer.
+The move from HACS to Marketplace does not change this repository, the
+`unifi_unas` domain or entity identities, and does not require a reinstall.
+Do not add a second copy. The separate reinstall requirement for versions
+before `0.8.0` still applies.
+
+See [installation, updates and removal](docs/installation.md) for existing
+installations, delayed catalog updates and manual recovery.
 
 ## First Setup
 
@@ -277,6 +288,8 @@ vendor-asset mistakes before publication.
 | Monitoring works but controls fail | The account may not have permission for optional local endpoints. |
 | Snapshot targets are missing | Enable snapshot options and verify endpoint support on this firmware. |
 | Device is off | This is expected; use Wake-on-LAN when configured. |
+| Marketplace is not available | Home Assistant versions before `2026.11` use HACS instead. |
+| Integration update is not offered | Check the release's minimum HA version and allow time for the catalog to refresh; do not reinstall to force an update. |
 
 More detail is in [docs/troubleshooting.md](docs/troubleshooting.md).
 
@@ -297,16 +310,21 @@ See [docs/known_limitations.md](docs/known_limitations.md).
 1. In Home Assistant, open `Settings` -> `Devices & services`.
 2. Open the `UniFi Drive / UNAS` integration entry.
 3. Choose `Delete`.
-4. Restart Home Assistant if you also want to remove custom integration files.
-5. Remove `/config/custom_components/unifi_unas/` or uninstall it through HACS.
+4. To remove the integration code too, first delete all its config entries,
+   then uninstall the repository through Marketplace (HACS on older HA).
+5. For a manual installation, remove only `/config/custom_components/unifi_unas/`.
+6. Complete the requested Home Assistant restart after removing the code.
 
-Removing only the files does not delete the Home Assistant config entry.
+Removing only the files does not delete the Home Assistant config entries.
+Removing entries affects entities, dashboards and automations that reference
+them; it does not delete data on the NAS. See the [removal checklist](docs/installation.md#removal).
 
 ## Documentation
 
 | Topic | Document |
 | --- | --- |
 | Installation and day-to-day use | This README |
+| Marketplace, HACS, updates and removal | [docs/installation.md](docs/installation.md) |
 | Entity surface overview | [docs/entities.md](docs/entities.md) |
 | Automation examples | [docs/examples.md](docs/examples.md) |
 | Troubleshooting guide | [docs/troubleshooting.md](docs/troubleshooting.md) |

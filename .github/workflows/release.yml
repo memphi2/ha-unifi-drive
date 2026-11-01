@@ -7,14 +7,21 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  issues: read
-  pull-requests: read
+  contents: read
 
 jobs:
+  validation:
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/validate.yml
+
   build_and_release:
     name: Build and publish release asset
+    needs: validation
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: read
+      pull-requests: read
 
     steps:
       - name: Checkout
@@ -31,6 +38,21 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           UNIFI_UNAS_FORBIDDEN_MARKERS: ${{ vars.UNIFI_UNAS_FORBIDDEN_MARKERS }}
         run: python scripts/audit_github_public_surfaces.py --repo "$GITHUB_REPOSITORY"
+
+      - name: Verify release tag matches manifest
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          manifest = json.loads(Path("custom_components/unifi_unas/manifest.json").read_text())
+          expected = f"v{manifest['version']}"
+          if os.environ["RELEASE_TAG"] != expected:
+              raise SystemExit(f"Release tag must be {expected}")
+          PY
 
       - name: Run repository release preflight
         env:

@@ -52,7 +52,7 @@ from .discovery_identity import (
     entry_matches_discovery_flow_context,
     should_write_discovery_identity_update,
 )
-from .device import build_device_info
+from .device import build_device_info, device_registry_metadata
 from .entry_options import (
     entry_bool,
     entry_value,
@@ -405,10 +405,9 @@ def _async_sync_device_registry_metadata(
         return False
 
     device_info = build_device_info(coordinator, entry, device_identifier)
-    updates: dict[str, object] = {}
-    for key in ("manufacturer", "model", "sw_version", "configuration_url"):
-        value = device_info.get(key)
-        if value and getattr(device_entry, key) != value:
+    updates: dict[str, str] = {}
+    for key, value in device_registry_metadata(device_info).items():
+        if getattr(device_entry, key) != value:
             updates[key] = value
 
     if not updates:

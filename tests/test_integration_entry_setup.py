@@ -576,6 +576,51 @@ def test_device_registry_metadata_sync_updates_firmware_version(hass) -> None:
     assert updated.sw_version == "5.1.10"
     assert updated.model == "UNAS2W"
 
+    with patch.object(
+        device_registry, "async_update_device", wraps=device_registry.async_update_device
+    ) as update:
+        assert _async_sync_device_registry_metadata(hass, entry, coordinator) is False
+    update.assert_not_called()
+
+
+@pytest.mark.parametrize("representation", ("native", "legacy"))
+def test_device_registry_metadata_sync_preserves_unset_fields(
+    hass, representation: str
+) -> None:
+    """Unset firmware/URL fields must not erase metadata or write the registry."""
+    _ensure_repo_custom_components_path()
+    from homeassistant.helpers import device_registry as dr
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.unifi_unas import _async_sync_device_registry_metadata
+    from custom_components.unifi_unas.const import DOMAIN
+
+    entry = MockConfigEntry(domain=DOMAIN, unique_id="system-id", data=_entry_data())
+    entry.add_to_hass(hass)
+    registry = dr.async_get(hass)
+    device = registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, "system-id")},
+        manufacturer="Ubiquiti",
+        model="UNAS2W",
+        sw_version="5.1.10",
+        configuration_url="https://unas.example",
+    )
+    factory = dr.DeviceInfo if representation == "native" else dict
+    info = factory(manufacturer="Ubiquiti", model="UNAS2W")
+
+    with (
+        patch("custom_components.unifi_unas.build_device_info", return_value=info),
+        patch.object(registry, "async_update_device", wraps=registry.async_update_device)
+        as update,
+    ):
+        assert _async_sync_device_registry_metadata(hass, entry, SimpleNamespace()) is False
+
+    update.assert_not_called()
+    assert registry.async_get(device.id) is device
+    assert device.sw_version == "5.1.10"
+    assert device.configuration_url == "https://unas.example"
+
 
 def test_device_registry_metadata_tracking_registers_refresh_listener(hass) -> None:
     """Device metadata tracking should sync immediately and on coordinator updates."""

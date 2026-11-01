@@ -31,6 +31,7 @@ python -m bandit -q -r custom_components scripts
 
 - release metadata alignment (`manifest`, `CHANGELOG`, release notes)
 - HACS metadata safety (`hacs.json`)
+- Marketplace installation/update/removal documentation and the UNAS catalog category
 - legal, trademark and asset hygiene checks
 - tracked-file secret checks and release ZIP privacy/legal/layout checks
 - public GitHub release, PR, issue and release-asset hygiene checks
@@ -41,6 +42,31 @@ python -m bandit -q -r custom_components scripts
 - typed runtime-data baseline and strict mypy gate structure
 - icon/exception translation baseline
 - full integration unit/fixture test suite
+
+## Marketplace And HA Version Checks
+
+HACS validation still applies to Marketplace: both use `hacs.json` and the same
+catalog. Do not rename the metadata file, change the domain or require users to
+reinstall solely for Marketplace. The user-facing procedures are in
+[installation.md](installation.md).
+
+For each newly supported HA line, use the required Python version and compatible
+HA test helpers. Run `python -m pip check` and inspect pytest's skip summary as
+well as the exit code. Without `pytest-homeassistant-custom-component`, this
+repository intentionally skips the HA-backed tests; that helper-only run cannot
+establish HA compatibility or satisfy the release coverage gate. The compatibility
+work still outstanding for November is tracked in [lts.md](lts.md).
+
+Before declaring Marketplace runtime compatibility, verify on a separate test HA:
+
+1. A fresh catalog install and initial setup without duplicate config entries.
+2. HACS takeover with existing `unifi_unas` entries and entity identities intact.
+3. An offered version update, required restart and successful entry reload.
+4. Reauthentication, reconfiguration and offline recovery after the update.
+5. Config-entry deletion followed by repository uninstall and restart.
+
+Keep the old pre-`0.8.0` domain migration separate from these tests. Record the
+tested HA/integration versions and outcomes, not credentials or local identifiers.
 
 ## Live Validation Notes
 
@@ -60,6 +86,14 @@ Do not finalize release work while any of these remain red:
 - compile checks
 - HACS validation workflow
 - Hassfest workflow
+
+Release publication first calls the complete validation workflow on the tagged
+commit, including both HA matrix legs, HA-backed tests and the 95% coverage floor.
+The publish job cannot run if that workflow fails, and non-tag manual runs do
+not publish. The tag must match the manifest version.
+
+The pending November release has a separate [v0.8.9 checklist](release_0.8.9.md).
+Do not treat beta smoke tests as proof of stable HA or Marketplace compatibility.
 
 Release publication also runs `scripts/check_repo.py` before building the ZIP and
 `scripts/check_release_zip.py` before uploading the release asset. It also runs

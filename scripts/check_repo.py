@@ -26,6 +26,7 @@ RELEASE_NOTES_DIR = ROOT / ".github" / "release-notes"
 LICENSE_PATH = ROOT / "LICENSE"
 LEGAL_PATH = ROOT / "docs" / "legal.md"
 LTS_PATH = ROOT / "docs" / "lts.md"
+INSTALLATION_PATH = ROOT / "docs" / "installation.md"
 STRINGS_PATH = INTEGRATION_DIR / "strings.json"
 ICONS_PATH = INTEGRATION_DIR / "icons.json"
 TRANSLATION_DIR = INTEGRATION_DIR / "translations"
@@ -185,6 +186,7 @@ CONFIG_FLOW_RELOAD_METHOD_PATTERNS = {
     "async_update_reload_and_abort": re.compile(r"\basync_update_reload_and_abort\("),
 }
 DEPRECATED_HOMEASSISTANT_API_PATTERNS = {
+    "RestoreStateData.last_states": re.compile(r"\.last_states\b"),
     "DeviceEntry.primary_config_entry": re.compile(r"\bprimary_config_entry\b"),
     "DeviceEntry.config_entries_subentries": re.compile(
         r"\bconfig_entries_subentries\b"
@@ -226,6 +228,21 @@ README_HIGHER_QUALITY_DOC_MARKERS = (
     "## Data Updates",
     "## Use Cases And Automation Examples",
     "## Silver Gold Platinum Roadmap",
+)
+MARKETPLACE_README_MARKERS = (
+    "### Home Assistant Marketplace",
+    "### HACS On Older Home Assistant Versions",
+    "## Updates",
+    "(docs/installation.md)",
+)
+INSTALLATION_DOC_MARKERS = (
+    "## Home Assistant Marketplace",
+    "## Home Assistant Before 2026.11",
+    "## Existing Installations",
+    "## Updates",
+    "## Upgrading From Before 0.8.0",
+    "## Removal",
+    "/config/custom_components/unifi_unas/",
 )
 
 MOJIBAKE_MARKERS = ("\u00c3", "\u00c2", "\u00e2\u20ac", "\ufffd")
@@ -529,6 +546,18 @@ def check_bronze_docs() -> None:
     ok("Quality-scale documentation sections validated")
 
 
+def check_marketplace_docs() -> None:
+    """Keep current and legacy installation paths documented together."""
+    for path, markers in (
+        (README_PATH, MARKETPLACE_README_MARKERS),
+        (INSTALLATION_PATH, INSTALLATION_DOC_MARKERS),
+    ):
+        missing = _missing_text_markers(path.read_text(encoding="utf-8"), markers)
+        if missing:
+            fail(f"{path.name} missing Marketplace documentation markers: {missing}")
+    ok("Marketplace and legacy installation documentation validated")
+
+
 def _tracked_file_paths() -> list[str]:
     """Return tracked paths from git."""
     git_bin = shutil.which("git")
@@ -640,6 +669,8 @@ def check_manifest() -> None:
         fail("manifest config_flow must be true")
     if manifest["integration_type"] != "device":
         fail("manifest integration_type must be 'device'")
+    if manifest.get("categories") != ["computers_network.nas_servers"]:
+        fail("manifest categories must identify UNAS as computers_network.nas_servers")
     if not isinstance(manifest.get("requirements"), list):
         fail("manifest requirements must be a list")
     if not manifest.get("codeowners"):
@@ -1064,10 +1095,10 @@ def check_validate_workflow_homeassistant_target() -> None:
         missing.append("Home Assistant package constraints")
     if "pytest-homeassistant-custom-component==${{ matrix.pytest_homeassistant }}" not in workflow_text:
         missing.append('"pytest-homeassistant-custom-component==${{ matrix.pytest_homeassistant }}"')
-    if "pip install --no-deps" not in workflow_text:
-        missing.append("pytest-homeassistant dependency isolation")
-    if 'Requirement(requirement).name == "homeassistant"' not in workflow_text:
-        missing.append("pytest-homeassistant Home Assistant dependency filter")
+    if "--no-deps" in workflow_text or 'Requirement(requirement).name == "homeassistant"' in workflow_text:
+        missing.append("HA/helper dependencies must not be bypassed")
+    if "python -m pip check" not in workflow_text:
+        missing.append("installed dependency consistency check")
     if "josepy<2.0; python_version < '3.13'" not in workflow_text:
         missing.append("Python 3.12 josepy compatibility pin")
     if "md.version(\"homeassistant\")" not in workflow_text:
@@ -1089,6 +1120,24 @@ def check_release_workflow_privacy_gates() -> None:
     if missing:
         fail(f"Release workflow missing privacy/layout gates: {missing}")
     ok("Release workflow privacy/layout gates validated")
+
+
+def check_release_validation_gate() -> None:
+    """Keep publication dependent on full validation of the tagged commit."""
+    validate_text = VALIDATE_WORKFLOW_PATH.read_text(encoding="utf-8")
+    release_text = RELEASE_WORKFLOW_PATH.read_text(encoding="utf-8")
+    if "  workflow_call:" not in validate_text:
+        fail("Validate workflow must support workflow_call for release validation")
+    for marker in (
+        "    uses: ./.github/workflows/validate.yml",
+        "    needs: validation",
+        "    if: startsWith(github.ref, 'refs/tags/v')",
+        "Verify release tag matches manifest",
+        'if os.environ["RELEASE_TAG"] != expected:',
+    ):
+        if marker not in release_text:
+            fail(f"Release workflow missing validation gate: {marker}")
+    ok("Release workflow complete-validation and tag gates validated")
 
 
 def _platform_parallel_updates(path: Path) -> int | None:
@@ -1300,6 +1349,7 @@ def main() -> None:
     ensure_file(LICENSE_PATH)
     ensure_file(LEGAL_PATH)
     ensure_file(LTS_PATH)
+    ensure_file(INSTALLATION_PATH)
     ensure_file(MANIFEST_PATH)
     ensure_file(HACS_PATH)
     ensure_file(QUALITY_SCALE_PATH)
@@ -1314,6 +1364,7 @@ def main() -> None:
     check_all_text_files_for_mojibake()
     check_legal_docs()
     check_bronze_docs()
+    check_marketplace_docs()
     check_tracked_file_hygiene()
     check_manifest()
     check_entity_name_rule()
@@ -1328,6 +1379,7 @@ def main() -> None:
     check_workflow_python_versions()
     check_validate_workflow_homeassistant_target()
     check_release_workflow_privacy_gates()
+    check_release_validation_gate()
     check_parallel_updates_rule()
     check_strict_typing_foundation()
     check_exception_translations()

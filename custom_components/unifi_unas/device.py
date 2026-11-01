@@ -50,6 +50,21 @@ def build_device_info(
     return DeviceInfo(**kwargs)
 
 
+def device_registry_metadata(device_info: DeviceInfo) -> dict[str, str]:
+    """Extract non-empty registry text from modern or legacy HA device info."""
+    metadata: dict[str, str] = {}
+    for key in ("manufacturer", "model", "sw_version", "configuration_url"):
+        if isinstance(device_info, dict):
+            # Home Assistant before 2026.11 represents DeviceInfo as a dict.
+            value = device_info.get(key)
+        else:
+            value = getattr(device_info, key, None)
+        # Unset dataclass fields contain truthy UNDEFINED, not None.
+        if isinstance(value, str) and value:
+            metadata[key] = value
+    return metadata
+
+
 def _device_metadata_payload(coordinator: Any) -> dict[str, Any]:
     """Return the best available system metadata payload for device info."""
     payload = getattr(coordinator, "data", None)

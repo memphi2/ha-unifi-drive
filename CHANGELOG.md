@@ -1,5 +1,27 @@
 # Changelog
 
+## v0.8.9 - HA 2026.11 and Marketplace preparation
+
+- Reads modern Home Assistant `DeviceInfo` through attributes while retaining
+  the older dictionary representation. Unset metadata preserves existing device
+  firmware/URLs, and unchanged metadata does not write the device registry.
+- Documents installation, updates and removal through Home Assistant Marketplace,
+  with HACS guidance for older HA versions and the existing pre-0.8.0 reinstall
+  requirement kept separate.
+- Adds the NAS/server catalog category without changing the integration domain,
+  advertised minimum HA version or runtime behavior.
+- Adds Marketplace as an installation method in support/bug forms and validates
+  the installation documentation, category and removed restore-state API guard.
+- Records the November HA compatibility follow-up and corrects the quality-scale
+  dependency comment: the discovery requirement is a minimum, not an exact pin.
+- Requires the complete validation workflow before release publication and
+  rejects tags that do not match the integration version.
+- Resolves the pinned HA runtime and test helper together and checks installed
+  dependencies instead of excluding the helper's Home Assistant requirement.
+
+Release is held until the final HA `2026.11` compatibility and Marketplace checks
+in [the release checklist](docs/release_0.8.9.md) are complete.
+
 ## v0.8.8 - HA 2026.10 compatibility maintenance
 
 Patch development for the next `0.8.x` maintenance release:

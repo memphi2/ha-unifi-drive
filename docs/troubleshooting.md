@@ -1,5 +1,14 @@
 # Troubleshooting
 
+## Installation Or Update Not Visible
+
+- Use Marketplace on Home Assistant `2026.11+`, HACS on older HA versions.
+- Search the shared catalog for `UniFi Drive / UNAS`; a custom repository is not needed.
+- Check the release's minimum HA version and allow time for catalog refreshes.
+- Follow any restart request after replacing loaded integration code.
+- Keep working config entries. See [installation and recovery](installation.md)
+  for manual layouts and the separate pre-`0.8.0` upgrade procedure.
+
 ## Device Cannot Be Reached
 
 - Verify host/IP, port, SSL and certificate settings.

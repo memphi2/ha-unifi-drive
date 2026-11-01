@@ -11,6 +11,7 @@ on:
   schedule:
     - cron: "0 3 * * 0"
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read
@@ -67,6 +68,7 @@ jobs:
           pip install \
             -c "https://raw.githubusercontent.com/home-assistant/core/${{ matrix.homeassistant }}/homeassistant/package_constraints.txt" \
             "homeassistant==${{ matrix.homeassistant }}" \
+            "pytest-homeassistant-custom-component==${{ matrix.pytest_homeassistant }}" \
             pytest \
             aiohttp \
             "josepy<2.0; python_version < '3.13'" \
@@ -75,20 +77,7 @@ jobs:
             coverage \
             mypy \
             packaging
-          pip install --no-deps \
-            "pytest-homeassistant-custom-component==${{ matrix.pytest_homeassistant }}"
-          python - <<'PY' > /tmp/pytest-homeassistant-custom-component-requirements.txt
-          from importlib.metadata import requires
-          from packaging.requirements import Requirement
-
-          for requirement in requires("pytest-homeassistant-custom-component") or []:
-              if Requirement(requirement).name == "homeassistant":
-                  continue
-              print(requirement)
-          PY
-          pip install \
-            -c "https://raw.githubusercontent.com/home-assistant/core/${{ matrix.homeassistant }}/homeassistant/package_constraints.txt" \
-            -r /tmp/pytest-homeassistant-custom-component-requirements.txt
+          python -m pip check
 
       - name: Verify Home Assistant test version
         run: |
@@ -120,6 +109,8 @@ jobs:
         run: bandit -q -r custom_components scripts
 
       - name: Run complete test suite
+        env:
+          PYTEST_ADDOPTS: ${{ matrix.python == '3.14' && '-o asyncio_default_fixture_loop_scope=function' || '' }}
         run: python -m coverage run -m pytest -q
 
       - name: Enforce coverage floor

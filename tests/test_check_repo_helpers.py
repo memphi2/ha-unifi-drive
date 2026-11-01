@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from tests.module_stubs import ROOT, load_repo_module
@@ -25,6 +27,40 @@ def test_manifest_version_tag_rejects_missing_version() -> None:
 
     with pytest.raises(SystemExit):
         module._manifest_version_tag({})
+
+
+def test_manifest_has_unas_marketplace_category() -> None:
+    """The shipped manifest must identify the NAS, not its individual sensors."""
+    _load_check_repo_module().check_manifest()
+
+
+@pytest.mark.parametrize(
+    "categories",
+    (
+        None,
+        [],
+        "computers_network.nas_servers",
+        ["nas"],
+        ["computers_network.nas_servers", "computers_network.nas_servers"],
+    ),
+)
+def test_manifest_rejects_missing_or_invalid_marketplace_category(
+    categories, tmp_path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    """Catch missing, mistyped and duplicate categories before catalog validation."""
+    module = _load_check_repo_module()
+    manifest = module.load_json(module.MANIFEST_PATH)
+    if categories is None:
+        manifest.pop("categories", None)
+    else:
+        manifest["categories"] = categories
+    path = tmp_path / "manifest.json"
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+    monkeypatch.setattr(module, "MANIFEST_PATH", path)
+
+    with pytest.raises(SystemExit):
+        module.check_manifest()
+    assert "manifest categories" in capsys.readouterr().out
 
 
 def test_changelog_release_entry_matches_version_heading() -> None:
@@ -185,6 +221,26 @@ def test_homeassistant_deprecation_guards_reject_device_entry_shims(
     )
     with pytest.raises(SystemExit):
         module.check_homeassistant_deprecation_guards()
+
+
+def test_homeassistant_deprecation_guards_reject_removed_restore_state_api(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    """Do not introduce direct last_states access removed in HA 2026.11."""
+    module = _load_check_repo_module()
+    integration_dir = tmp_path / "unifi_unas"
+    integration_dir.mkdir()
+    source = integration_dir / "sensor.py"
+    monkeypatch.setattr(module, "INTEGRATION_DIR", integration_dir)
+    source.write_text(
+        "state = restore_data.async_get_stored_state(entity_id)\n", encoding="utf-8"
+    )
+    module.check_homeassistant_deprecation_guards()
+
+    source.write_text("state = restore_data.last_states.get(entity_id)\n", encoding="utf-8")
+    with pytest.raises(SystemExit):
+        module.check_homeassistant_deprecation_guards()
+    assert "RestoreStateData.last_states" in capsys.readouterr().out
 
 
 def test_workflow_action_versions_reject_node20_actions(
@@ -371,9 +427,8 @@ def test_validate_workflow_requires_homeassistant_compatibility_targets(
         "-c \"https://raw.githubusercontent.com/home-assistant/core/${{ matrix.homeassistant }}/homeassistant/package_constraints.txt\" "
         "\"homeassistant==${{ matrix.homeassistant }}\" "
         "\"josepy<2.0; python_version < '3.13'\" pytest\n"
-        "      pip install --no-deps \"pytest-homeassistant-custom-component==${{ matrix.pytest_homeassistant }}\"\n"
-        "      if Requirement(requirement).name == \"homeassistant\":\n"
-        "          continue\n"
+        "      pip install \"pytest-homeassistant-custom-component==${{ matrix.pytest_homeassistant }}\"\n"
+        "      python -m pip check\n"
         "  - run: |\n"
         "      import os\n"
         "      import importlib.metadata as md\n"
@@ -446,9 +501,8 @@ def test_validate_workflow_must_cover_hacs_minimum(
         "      pip install "
         "-c \"https://raw.githubusercontent.com/home-assistant/core/${{ matrix.homeassistant }}/homeassistant/package_constraints.txt\" "
         "\"homeassistant==${{ matrix.homeassistant }}\"\n"
-        "      pip install --no-deps \"pytest-homeassistant-custom-component==${{ matrix.pytest_homeassistant }}\"\n"
-        "      if Requirement(requirement).name == \"homeassistant\":\n"
-        "          continue\n"
+        "      pip install \"pytest-homeassistant-custom-component==${{ matrix.pytest_homeassistant }}\"\n"
+        "      python -m pip check\n"
         "      version = md.version(\"homeassistant\")\n"
         "      if version != expected:\n"
         "          raise SystemExit()\n"
@@ -470,6 +524,51 @@ def test_validate_workflow_must_cover_hacs_minimum(
     )
     with pytest.raises(SystemExit):
         module.check_validate_workflow_homeassistant_target()
+
+
+@pytest.mark.parametrize(
+    "unsafe_install", ("pip install --no-deps helper", 'if Requirement(requirement).name == "homeassistant":')
+)
+def test_validate_workflow_rejects_dependency_bypasses(
+    unsafe_install: str, tmp_path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    """A green environment must respect the HA version required by its fixtures."""
+    module = _load_check_repo_module()
+    source = module.VALIDATE_WORKFLOW_PATH.read_text(encoding="utf-8")
+    path = tmp_path / "validate.yml"
+    path.write_text(source + "\n" + unsafe_install, encoding="utf-8")
+    monkeypatch.setattr(module, "VALIDATE_WORKFLOW_PATH", path)
+    with pytest.raises(SystemExit):
+        module.check_validate_workflow_homeassistant_target()
+    assert "must not be bypassed" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    "marker",
+    (
+        "  workflow_call:",
+        "    uses: ./.github/workflows/validate.yml",
+        "    needs: validation",
+        "    if: startsWith(github.ref, 'refs/tags/v')",
+        "Verify release tag matches manifest",
+        'if os.environ["RELEASE_TAG"] != expected:',
+    ),
+)
+def test_release_workflow_requires_full_validation(
+    marker: str, tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Removing a publication prerequisite must fail repository validation."""
+    module = _load_check_repo_module()
+    module.check_release_validation_gate()
+    attribute = (
+        "VALIDATE_WORKFLOW_PATH" if marker == "  workflow_call:" else "RELEASE_WORKFLOW_PATH"
+    )
+    source = getattr(module, attribute).read_text(encoding="utf-8")
+    path = tmp_path / "workflow.yml"
+    path.write_text(source.replace(marker, ""), encoding="utf-8")
+    monkeypatch.setattr(module, attribute, path)
+    with pytest.raises(SystemExit):
+        module.check_release_validation_gate()
 
 
 def test_release_workflow_requires_privacy_gates(
@@ -796,6 +895,34 @@ def test_bronze_docs_require_core_readme_sections(
     readme_path.write_text("## Installation\n", encoding="utf-8")
     with pytest.raises(SystemExit):
         module.check_bronze_docs()
+
+
+@pytest.mark.parametrize(
+    "missing_section", ("marketplace", "legacy", "upgrade", "removal")
+)
+def test_marketplace_docs_require_current_and_legacy_instructions(
+    missing_section: str, tmp_path, monkeypatch: pytest.MonkeyPatch, capsys
+) -> None:
+    """Keep the Marketplace path and the old-domain migration distinct."""
+    module = _load_check_repo_module()
+    readme = tmp_path / "README.md"
+    installation = tmp_path / "installation.md"
+    readme.write_text("\n".join(module.MARKETPLACE_README_MARKERS), encoding="utf-8")
+    installation.write_text("\n".join(module.INSTALLATION_DOC_MARKERS), encoding="utf-8")
+    monkeypatch.setattr(module, "README_PATH", readme)
+    monkeypatch.setattr(module, "INSTALLATION_PATH", installation)
+    module.check_marketplace_docs()
+
+    path, marker = {
+        "marketplace": (readme, "### Home Assistant Marketplace"),
+        "legacy": (installation, "## Home Assistant Before 2026.11"),
+        "upgrade": (installation, "## Upgrading From Before 0.8.0"),
+        "removal": (installation, "## Removal"),
+    }[missing_section]
+    path.write_text(path.read_text(encoding="utf-8").replace(marker, ""), encoding="utf-8")
+    with pytest.raises(SystemExit):
+        module.check_marketplace_docs()
+    assert "missing Marketplace documentation" in capsys.readouterr().out
 
 
 @pytest.mark.parametrize(

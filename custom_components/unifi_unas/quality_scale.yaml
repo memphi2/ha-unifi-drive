@@ -19,7 +19,7 @@ rules:
     comment: Setup, discovery, reauth and reconfigure are UI-driven.
   dependency-transparency:
     status: done
-    comment: External requirements are pinned in manifest.json.
+    comment: The external discovery dependency and its minimum version are declared in manifest.json; it is not exactly pinned.
   docs-actions:
     status: done
     comment: README documents services and entity actions.
@@ -28,10 +28,10 @@ rules:
     comment: README describes the local-first UniFi Drive / UNAS integration.
   docs-installation-instructions:
     status: done
-    comment: README covers HACS and manual installation.
+    comment: README and docs/installation.md cover Marketplace, older HACS installs, manual installation and the pre-0.8.0 upgrade.
   docs-removal-instructions:
     status: done
-    comment: README covers Home Assistant and HACS removal.
+    comment: README and docs/installation.md separate config-entry deletion, Marketplace/HACS uninstall and manual file removal.
   entity-event-setup:
     status: done
     comment: Dynamic entity listeners are registered through entry unload cleanup.
