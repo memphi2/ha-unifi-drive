@@ -2,6 +2,8 @@
 
 ## v0.8.9 - HA 2026.11 and Marketplace preparation
 
+- Requires separate Code Review and dedicated Security Review evidence for the
+  final PR head before release; documents the release-owner verification gate.
 - Updates the stable CI target to HA `2026.10.4` with matching test helper
   `0.13.375`; keeps the HACS-advertised `2024.8.0` minimum covered.
 - Streamlines the README around features, options, setup and everyday use;

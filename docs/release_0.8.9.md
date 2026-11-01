@@ -37,8 +37,13 @@ The release owner must complete the gates below on the final PR commit.
   missing firmware does not erase it. Check for duplicate devices and entities.
 - [ ] Run the public GitHub and packaged ZIP privacy/legal checks. Personal
   marker lists come only from environment/Actions variables, never tracked files.
-- [ ] Resolve bot findings and request another review after changes. The final
-  reviewed commit must match the PR head; CI success is not bot approval.
+- [ ] Complete normal Code Review of the final PR head and resolve actionable
+  findings. Record the full SHA and review link in the PR.
+- [ ] Complete a separate dedicated Security Review of that same head. Inspect
+  the full Security Report, resolve actionable findings and record the report
+  link/outcome in the PR. A normal bot review or missing comments is not enough.
+  Repeat both reviews after any new commit; failed or inaccessible tasks block
+  release. Follow the [review policy](validation.md#code-and-security-review).
 - [ ] Record the exact tested versions, run URLs and anonymized live outcomes
   below. Update release wording to reflect only completed checks and remove
   stale preparation notices from the changelog when approving publication.
@@ -53,11 +58,12 @@ The release owner must complete the gates below on the final PR commit.
 | Stable HA 2026.11 / matching test helper | Pending upstream release and full test run |
 | November `DeviceInfo` | Focused check against actual HA `2026.11.0b1` passed; not a full compatibility result |
 | Marketplace live lifecycle | Pending; no new live-test claim |
-| Final CI / bot review | Record final head and run/review URLs in the PR |
+| Final CI / Code Review | Record final head and run/review URLs in the PR |
+| Dedicated Security Review | Separate final-head task and full report required; not implied by Code Review or CI |
 
 ## Publication After Approval
 
-1. Verify the final head, all checks, bot feedback and this checklist again.
+1. Verify the final head, all checks, both review results and this checklist again.
 2. Merge only after explicit release approval. Verify `main` contains the
    approved code and `manifest.json` version `0.8.9`.
 3. Create tag `v0.8.9` on that exact commit. The release workflow reruns complete
