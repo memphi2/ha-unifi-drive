@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 import logging
@@ -53,6 +54,7 @@ _LOGGER = logging.getLogger(__name__)
 _SNAPSHOT_INVENTORY_UNAVAILABLE_MARKER = "not available on this system"
 _SNAPSHOT_INVENTORY_REFRESH_INTERVAL = timedelta(minutes=10)
 _CONNECTION_FAILURES_BEFORE_OFFLINE = 2
+_OPTIONAL_REFRESH_TIMEOUT = 10
 
 
 class UnifiUnasCoordinator(DataUpdateCoordinator[dict[str, Any]]):  # type: ignore[misc]
@@ -95,6 +97,8 @@ class UnifiUnasCoordinator(DataUpdateCoordinator[dict[str, Any]]):  # type: igno
         self._snapshot_inventory_refresh_requested = False
         self._snapshot_inventory_target_keys: set[str] = set()
         self._first_refresh_core_only = False
+        self._optional_refresh_lock = asyncio.Lock()
+        self._optional_refresh_timed_out = False
         interval = entry_int(entry, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         interval = max(MIN_SCAN_INTERVAL, min(MAX_SCAN_INTERVAL, interval))
 
@@ -142,14 +146,28 @@ class UnifiUnasCoordinator(DataUpdateCoordinator[dict[str, Any]]):  # type: igno
         return storage
 
     async def _async_refresh_optional_features(self) -> None:
-        """Refresh optional endpoints without blocking core storage data."""
-        await self._refresh_fan_mode()
-        await self._refresh_backup_tasks()
-
-        if self.snapshot_buttons_enabled:
-            await self._refresh_snapshot_settings()
-        else:
-            self._clear_snapshot_settings_state()
+        """Bound optional polling latency and avoid overlapping startup refreshes."""
+        if self._optional_refresh_lock.locked():
+            return
+        async with self._optional_refresh_lock:
+            try:
+                async with asyncio.timeout(_OPTIONAL_REFRESH_TIMEOUT):
+                    await self._refresh_fan_mode()
+                    await self._refresh_backup_tasks()
+                    if self.snapshot_buttons_enabled:
+                        await self._refresh_snapshot_settings()
+                    else:
+                        self._clear_snapshot_settings_state()
+            except TimeoutError:
+                if not self._optional_refresh_timed_out:
+                    _LOGGER.debug(
+                        "Optional polling exceeded its time budget; publishing core storage data"
+                    )
+                self._optional_refresh_timed_out = True
+            else:
+                if self._optional_refresh_timed_out:
+                    _LOGGER.debug("Optional polling recovered within its time budget")
+                self._optional_refresh_timed_out = False
 
     def _handle_connection_recovered(self) -> None:
         """Log once when polling recovers after a connection failure."""
@@ -226,6 +244,9 @@ class UnifiUnasCoordinator(DataUpdateCoordinator[dict[str, Any]]):  # type: igno
         """Refresh snapshot settings and trigger inventory refresh if possible."""
         try:
             settings = await self.client.async_get_snapshot_settings()
+        except asyncio.CancelledError:
+            self.snapshot_settings_available = False
+            raise
         except (
             CannotConnect,
             InvalidAuth,
@@ -288,6 +309,9 @@ class UnifiUnasCoordinator(DataUpdateCoordinator[dict[str, Any]]):  # type: igno
             self._snapshot_inventory_refresh_requested = False
         try:
             self.snapshot_inventory = await self._async_get_snapshot_inventory(active_target_keys)
+        except asyncio.CancelledError:
+            self._snapshot_inventory_refresh_requested = True
+            raise
         except (RuntimeError, TypeError, ValueError) as err:
             if refresh_requested:
                 self._snapshot_inventory_refresh_requested = True

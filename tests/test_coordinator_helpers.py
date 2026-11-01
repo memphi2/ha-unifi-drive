@@ -865,6 +865,67 @@ async def _noop_refresh():
     """Avoid inventory requests when testing the settings state machine."""
 
 
+def test_optional_polling_budget_publishes_core_data_and_recovers(monkeypatch) -> None:
+    """A stalled optional endpoint cannot hold a storage update indefinitely."""
+    monkeypatch.setattr(coordinator_module, "_OPTIONAL_REFRESH_TIMEOUT", 0.01)
+
+    class Client:
+        stalled = True
+        cancelled = False
+
+        async def async_get_storage(self):
+            return {"pools": []}
+
+        async def async_get_backup_tasks(self):
+            if self.stalled:
+                try:
+                    await asyncio.Event().wait()
+                finally:
+                    self.cancelled = True
+            return []
+
+    async def run():
+        client = Client()
+        coordinator = coordinator_module.UnifiUnasCoordinator(
+            types.SimpleNamespace(), client, _FakeSnapshotPollingEntry()
+        )
+        coordinator.snapshot_buttons_enabled = False
+        assert await asyncio.wait_for(coordinator._async_update_data(), timeout=1) == {"pools": []}
+        assert client.cancelled
+        assert coordinator._optional_refresh_timed_out
+        assert not coordinator._optional_refresh_lock.locked()
+        client.stalled = False
+        await coordinator._async_update_data()
+        assert not coordinator._optional_refresh_timed_out
+        async with coordinator._optional_refresh_lock:
+            await coordinator._async_refresh_optional_features()
+
+    asyncio.run(run())
+
+
+def test_cancelled_snapshot_inventory_keeps_refresh_request() -> None:
+    """Timeout/unload cancellation cannot consume an explicit inventory refresh."""
+    async def cancel(*args):
+        raise asyncio.CancelledError
+
+    async def run():
+        coordinator = coordinator_module.UnifiUnasCoordinator(
+            types.SimpleNamespace(), object(), _FakeSnapshotPollingEntry()
+        )
+        coordinator.request_snapshot_inventory_refresh()
+        coordinator._async_get_snapshot_inventory = cancel
+        try:
+            await coordinator._async_refresh_snapshot_inventory_if_due()
+        except asyncio.CancelledError:
+            pass
+        else:
+            raise AssertionError("Cancellation must propagate")
+        assert coordinator._snapshot_inventory_refresh_requested
+        assert coordinator._snapshot_inventory_last_refresh is None
+
+    asyncio.run(run())
+
+
 def test_snapshot_settings_connection_failures_do_not_create_repairs() -> None:
     """Powered-off/offline devices should not create snapshot repair issues."""
     original_create_issue = coordinator_module.async_create_snapshot_read_issue
