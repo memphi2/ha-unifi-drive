@@ -215,6 +215,8 @@ class UnifiUnasSnapshotTargetEntity(
 
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
+    # Inventory owns count history; controls still expose live counts to cards.
+    _unrecorded_attributes = frozenset({"total_count", "locked_count"})
 
     def __init__(
         self,

@@ -154,6 +154,11 @@ Snapshot preview lists, IDs, names and descriptions remain visible in current
 entity attributes but are excluded from Recorder history. Counts and timestamps
 remain recordable. Large previews therefore do not duplicate their full contents
 in the database on each change.
+Snapshot controls also exclude duplicate total/locked counts from recorded
+attributes; the inventory sensor retains count history. Live attribute changes
+can still generate Recorder state rows even when the recorded attributes are
+unchanged. Exclude individual control entities in your Recorder configuration
+if you do not need their history.
 
 Review attachments before posting. Do not share credentials or unredacted device
 API responses. Report reproducible problems through

@@ -271,6 +271,36 @@ class _SnapshotIntegrationClient:
 
 
 @pytest.mark.asyncio
+async def test_control_recorder_attributes_stay_stable_during_snapshot_count_changes(hass) -> None:
+    """Counter churn stays visible live without new control attribute blobs."""
+    from homeassistant.components.recorder.db_schema import StateAttributes
+    from homeassistant.const import EVENT_STATE_CHANGED
+    from homeassistant.core import Event
+
+    target = _snapshot_target_with_controls()
+    client = _SnapshotIntegrationClient([target])
+    entry, controls = await _setup_snapshot_controls(hass, client)
+
+    def recorded(entity_id):
+        return StateAttributes.shared_attrs_bytes_from_event(
+            Event(EVENT_STATE_CHANGED, {
+                "entity_id": entity_id, "old_state": None,
+                "new_state": hass.states.get(entity_id),
+            }), None,
+        )
+
+    before = {entity_id: recorded(entity_id) for entity_id in controls.values()}
+    for count in range(5, 25):
+        target.update(total_count=count, locked_count=count - 5)
+        entry.runtime_data.async_set_updated_data(entry.runtime_data.data)
+        await hass.async_block_till_done()
+        for entity_id in controls.values():
+            assert hass.states.get(entity_id).attributes["total_count"] == count
+            assert recorded(entity_id) == before[entity_id]
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+@pytest.mark.asyncio
 async def test_snapshot_recorder_omits_preview_but_keeps_live_attributes(hass) -> None:
     """Real HA states retain previews while recorder serializes only useful history."""
     import json
