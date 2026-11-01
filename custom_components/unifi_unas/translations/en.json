@@ -397,57 +397,57 @@
         }
       },
       "pool_status": {
-        "name": "Status",
+        "name": "{pool_name} Status",
         "state": {
           "healthy": "Healthy",
           "degraded": "Degraded"
         }
       },
       "pool_capacity": {
-        "name": "Capacity"
+        "name": "{pool_name} Capacity"
       },
       "pool_used": {
-        "name": "Used"
+        "name": "{pool_name} Used"
       },
       "pool_available": {
-        "name": "Available"
+        "name": "{pool_name} Available"
       },
       "pool_usage_percent": {
-        "name": "Usage"
+        "name": "{pool_name} Usage"
       },
       "pool_raid_level": {
-        "name": "RAID level"
+        "name": "{pool_name} RAID level"
       },
       "pool_drive_count": {
-        "name": "Drive count"
+        "name": "{pool_name} Drive count"
       },
       "pool_rebuild_progress": {
-        "name": "Rebuild progress"
+        "name": "{pool_name} Rebuild progress"
       },
       "pool_sync_progress": {
-        "name": "Sync progress"
+        "name": "{pool_name} Sync progress"
       },
       "pool_at_risk_drive_count": {
-        "name": "At-risk drive count"
+        "name": "{pool_name} At-risk drive count"
       },
       "pool_average_drive_temperature": {
-        "name": "Average drive temperature"
+        "name": "{pool_name} Average drive temperature"
       },
       "drive_status": {
-        "name": "Status",
+        "name": "{pool_name} {drive_name} Status",
         "state": {
           "optimal": "Optimal",
           "at_risk": "At risk"
         }
       },
       "drive_temperature": {
-        "name": "Temperature"
+        "name": "{pool_name} {drive_name} Temperature"
       },
       "drive_power_on_hours": {
-        "name": "Power-on hours"
+        "name": "{pool_name} {drive_name} Power-on hours"
       },
       "snapshot_inventory": {
-        "name": "Snapshot inventory"
+        "name": "{target_name} Snapshot inventory"
       },
       "degraded_pool_count": {
         "name": "Degraded pool count"
@@ -497,10 +497,10 @@
         "name": "Maintenance active"
       },
       "pool_problem": {
-        "name": "Problem"
+        "name": "{pool_name} Problem"
       },
       "pool_maintenance_active": {
-        "name": "Maintenance active"
+        "name": "{pool_name} Maintenance active"
       }
     },
     "button": {
@@ -517,10 +517,10 @@
         "name": "Start"
       },
       "backup_task": {
-        "name": "Run backup"
+        "name": "{task_name} Run backup"
       },
       "snapshot_create": {
-        "name": "Create snapshot"
+        "name": "{target_name} Create snapshot"
       }
     },
     "select": {
@@ -528,28 +528,28 @@
         "name": "Fan mode"
       },
       "snapshot_schedule": {
-        "name": "Snapshot schedule"
+        "name": "{target_name} Snapshot schedule"
       },
       "snapshot_weekday": {
-        "name": "Snapshot weekday"
+        "name": "{target_name} Snapshot weekday"
       }
     },
     "number": {
       "snapshot_limit": {
-        "name": "Snapshot limit"
+        "name": "{target_name} Snapshot limit"
       },
       "snapshot_month_day": {
-        "name": "Snapshot month day"
+        "name": "{target_name} Snapshot month day"
       }
     },
     "switch": {
       "snapshot_enabled": {
-        "name": "Snapshots"
+        "name": "{target_name} Snapshots"
       }
     },
     "time": {
       "snapshot_schedule_time": {
-        "name": "Snapshot schedule time"
+        "name": "{target_name} Snapshot schedule time"
       }
     },
     "update": {

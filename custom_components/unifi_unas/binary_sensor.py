@@ -175,8 +175,7 @@ class UnifiUnasPoolBinarySensor(UnifiUnasBaseBinarySensor):
         self.entity_description = description
         self._pool_key = pool_key
         self._pool_name = pool_name
-        suffix = description.name or description.key
-        self._attr_name = f"{pool_name} {suffix}"
+        self._attr_translation_placeholders = {"pool_name": pool_name}
         self._attr_unique_id = (
             f"{self._device_identifier}_{self._pool_key}_{description.key}"
         )

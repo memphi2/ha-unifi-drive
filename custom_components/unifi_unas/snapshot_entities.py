@@ -225,7 +225,6 @@ class UnifiUnasSnapshotTargetEntity(
         target: Mapping[str, Any],
         *,
         entity_key: str,
-        name_suffix: str,
         icon: str | None = None,
     ) -> None:
         """Initialize the snapshot target entity."""
@@ -236,7 +235,7 @@ class UnifiUnasSnapshotTargetEntity(
         self._target_name = snapshot_target_name(target)
         self._target_type = snapshot_target_type(target)
         self._snapshot_target_missing_count = 0
-        self._attr_name = f"{self._target_name} {name_suffix}"
+        self._attr_translation_placeholders = {"target_name": self._target_name}
         self._attr_translation_key = f"snapshot_{entity_key}"
         self._attr_unique_id = (
             f"{self._device_identifier}_snapshot_{snapshot_target_slug(self._target_key)}"

@@ -220,6 +220,25 @@ def _state(hass, entity_id: str) -> str:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("language,capacity,temperature,maintenance", [
+    ("en", "Capacity", "Temperature", "Maintenance active"),
+    ("de", "Kapazitaet", "Temperatur", "Wartung aktiv"),
+])
+async def test_pool_and_drive_names_are_translated(hass, language, capacity, temperature, maintenance):
+    """Dynamic pool and drive names work even for disabled diagnostic entities."""
+    from homeassistant.helpers import entity_registry as er
+
+    hass.config.language = language
+    entry = await _async_setup_monitoring_entry(hass, _MonitoringClient())
+    entities = er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
+    for key, suffix in (("pool_capacity", capacity), ("drive_temperature", temperature), ("pool_maintenance_active", maintenance)):
+        entity = next(item for item in entities if item.translation_key == key)
+        assert entity.original_name.startswith("Main ")
+        assert entity.original_name.endswith(suffix)
+        assert "{" not in entity.original_name
+
+
+@pytest.mark.asyncio
 async def test_core_monitoring_states_survive_degraded_offline_online_cycle(hass) -> None:
     """Core monitoring entities should change state without becoming unavailable."""
     from custom_components.unifi_unas.const import DOMAIN

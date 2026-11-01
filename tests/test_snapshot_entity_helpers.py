@@ -217,7 +217,6 @@ def test_snapshot_target_entity_registry_is_cleared_on_unload() -> None:
         _FakeEntry(),
         target,
         entity_key="enabled",
-        name_suffix="Snapshots",
         icon="mdi:camera-switch",
     )
 
@@ -253,7 +252,6 @@ def test_snapshot_target_entity_tracks_missing_target_lifecycle() -> None:
             _FakeEntry(),
             target,
             entity_key="enabled",
-            name_suffix="Snapshots",
             icon="mdi:camera-switch",
         )
 
@@ -507,7 +505,6 @@ def test_snapshot_entity_blocks_writes_while_offline() -> None:
         _FakeEntry(),
         target,
         entity_key="enabled",
-        name_suffix="Snapshots",
         icon="mdi:camera-switch",
     )
 
@@ -534,7 +531,6 @@ def test_snapshot_entity_with_invalid_target_key_has_absent_state() -> None:
         _FakeEntry(),
         {},
         entity_key="enabled",
-        name_suffix="Snapshots",
         icon="mdi:camera-switch",
     )
 
@@ -558,7 +554,6 @@ def test_snapshot_entity_current_target_skips_invalid_snapshot_settings_entries(
         _FakeEntry(),
         {"type": "shared", "id": "shared-1", "name": "Shared"},
         entity_key="enabled",
-        name_suffix="Snapshots",
         icon="mdi:camera-switch",
     )
 

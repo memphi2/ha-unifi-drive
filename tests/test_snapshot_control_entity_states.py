@@ -271,6 +271,25 @@ class _SnapshotIntegrationClient:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("language,suffix", [("en", "Snapshot limit"), ("de", "Snapshot-Limit")])
+async def test_snapshot_names_use_translations_and_preserve_registry_identity(hass, language, suffix):
+    """Target names are placeholders, while the control label is translated."""
+    from homeassistant.helpers import entity_registry as er
+
+    hass.config.language = language
+    client = _SnapshotIntegrationClient([_snapshot_target_with_controls()])
+    entry, controls = await _setup_snapshot_controls(hass, client)
+    entity_id = controls["limit"]
+    assert hass.states.get(entity_id).attributes["friendly_name"] == f"UNAS Team Drive {suffix}"
+    registry_entry = er.async_get(hass).async_get(entity_id)
+    assert registry_entry.unique_id == _snapshot_unique_ids(client.snapshot_settings[0], entry.unique_id)["limit"]
+    er.async_get(hass).async_update_entity(entity_id, name="Custom retention")
+    entry.runtime_data.async_set_updated_data(entry.runtime_data.data)
+    await hass.async_block_till_done()
+    assert er.async_get(hass).async_get(entity_id).name == "Custom retention"
+
+
+@pytest.mark.asyncio
 async def test_control_recorder_attributes_stay_stable_during_snapshot_count_changes(hass) -> None:
     """Counter churn stays visible live without new control attribute blobs."""
     from homeassistant.components.recorder.db_schema import StateAttributes

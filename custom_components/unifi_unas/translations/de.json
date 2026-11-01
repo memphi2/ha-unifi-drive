@@ -397,57 +397,57 @@
         }
       },
       "pool_status": {
-        "name": "Status",
+        "name": "{pool_name} Status",
         "state": {
           "healthy": "Gesund",
           "degraded": "Degradiert"
         }
       },
       "pool_capacity": {
-        "name": "Kapazitaet"
+        "name": "{pool_name} Kapazitaet"
       },
       "pool_used": {
-        "name": "Belegt"
+        "name": "{pool_name} Belegt"
       },
       "pool_available": {
-        "name": "Verfuegbar"
+        "name": "{pool_name} Verfuegbar"
       },
       "pool_usage_percent": {
-        "name": "Auslastung"
+        "name": "{pool_name} Auslastung"
       },
       "pool_raid_level": {
-        "name": "RAID-Level"
+        "name": "{pool_name} RAID-Level"
       },
       "pool_drive_count": {
-        "name": "Anzahl Festplatten"
+        "name": "{pool_name} Anzahl Festplatten"
       },
       "pool_rebuild_progress": {
-        "name": "Rebuild-Fortschritt"
+        "name": "{pool_name} Rebuild-Fortschritt"
       },
       "pool_sync_progress": {
-        "name": "Sync-Fortschritt"
+        "name": "{pool_name} Sync-Fortschritt"
       },
       "pool_at_risk_drive_count": {
-        "name": "Anzahl riskanter Festplatten"
+        "name": "{pool_name} Anzahl riskanter Festplatten"
       },
       "pool_average_drive_temperature": {
-        "name": "Durchschnittliche Festplattentemperatur"
+        "name": "{pool_name} Durchschnittliche Festplattentemperatur"
       },
       "drive_status": {
-        "name": "Status",
+        "name": "{pool_name} {drive_name} Status",
         "state": {
           "optimal": "Optimal",
           "at_risk": "Riskant"
         }
       },
       "drive_temperature": {
-        "name": "Temperatur"
+        "name": "{pool_name} {drive_name} Temperatur"
       },
       "drive_power_on_hours": {
-        "name": "Betriebsstunden"
+        "name": "{pool_name} {drive_name} Betriebsstunden"
       },
       "snapshot_inventory": {
-        "name": "Snapshot-Inventar"
+        "name": "{target_name} Snapshot-Inventar"
       },
       "degraded_pool_count": {
         "name": "Anzahl degradierter Pools"
@@ -497,10 +497,10 @@
         "name": "Wartung aktiv"
       },
       "pool_problem": {
-        "name": "Problem"
+        "name": "{pool_name} Problem"
       },
       "pool_maintenance_active": {
-        "name": "Wartung aktiv"
+        "name": "{pool_name} Wartung aktiv"
       }
     },
     "button": {
@@ -517,10 +517,10 @@
         "name": "Starten"
       },
       "backup_task": {
-        "name": "Backup starten"
+        "name": "{task_name} Backup starten"
       },
       "snapshot_create": {
-        "name": "Snapshot erstellen"
+        "name": "{target_name} Snapshot erstellen"
       }
     },
     "select": {
@@ -528,28 +528,28 @@
         "name": "Lueftermodus"
       },
       "snapshot_schedule": {
-        "name": "Snapshot-Zeitplan"
+        "name": "{target_name} Snapshot-Zeitplan"
       },
       "snapshot_weekday": {
-        "name": "Snapshot-Wochentag"
+        "name": "{target_name} Snapshot-Wochentag"
       }
     },
     "number": {
       "snapshot_limit": {
-        "name": "Snapshot-Limit"
+        "name": "{target_name} Snapshot-Limit"
       },
       "snapshot_month_day": {
-        "name": "Snapshot-Monatstag"
+        "name": "{target_name} Snapshot-Monatstag"
       }
     },
     "switch": {
       "snapshot_enabled": {
-        "name": "Snapshots"
+        "name": "{target_name} Snapshots"
       }
     },
     "time": {
       "snapshot_schedule_time": {
-        "name": "Snapshot-Zeit"
+        "name": "{target_name} Snapshot-Zeit"
       }
     },
     "update": {

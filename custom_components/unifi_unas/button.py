@@ -324,7 +324,7 @@ class UnifiUnasBackupTaskButton(
         self._device_identifier = entry.unique_id or entry.entry_id
         self._task_id = str(task["id"])
         self._task_name = str(task.get("name") or self._task_id)
-        self._attr_name = f"{self._task_name} Run Backup"
+        self._attr_translation_placeholders = {"task_name": self._task_name}
         self._attr_unique_id = f"{self._device_identifier}_backup_{self._task_id}"
 
     @property
@@ -403,7 +403,6 @@ class UnifiUnasSnapshotButton(
             entry,
             target,
             entity_key="create",
-            name_suffix="Create Snapshot",
         )
         self._target_type = snapshot_target_type(target)
         # Keep the v0.3.0 create-button unique ID stable while sharing the

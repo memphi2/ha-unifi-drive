@@ -213,13 +213,11 @@ AGGREGATE_SENSOR_TYPES: tuple[AggregateSensorDescription, ...] = (
 POOL_SENSOR_TYPES: tuple[PoolSensorDescription, ...] = (
     PoolSensorDescription(
         key="pool_status",
-        name="Status",
         translation_key="pool_status",
         value_fn=lambda pool: _pool_status(pool),
     ),
     PoolSensorDescription(
         key="pool_capacity",
-        name="Capacity",
         translation_key="pool_capacity",
         device_class=SensorDeviceClass.DATA_SIZE,
         native_unit_of_measurement=UnitOfInformation.GIBIBYTES,
@@ -230,7 +228,6 @@ POOL_SENSOR_TYPES: tuple[PoolSensorDescription, ...] = (
     ),
     PoolSensorDescription(
         key="pool_used",
-        name="Used",
         translation_key="pool_used",
         device_class=SensorDeviceClass.DATA_SIZE,
         native_unit_of_measurement=UnitOfInformation.GIBIBYTES,
@@ -241,7 +238,6 @@ POOL_SENSOR_TYPES: tuple[PoolSensorDescription, ...] = (
     ),
     PoolSensorDescription(
         key="pool_available",
-        name="Available",
         translation_key="pool_available",
         device_class=SensorDeviceClass.DATA_SIZE,
         native_unit_of_measurement=UnitOfInformation.GIBIBYTES,
@@ -252,7 +248,6 @@ POOL_SENSOR_TYPES: tuple[PoolSensorDescription, ...] = (
     ),
     PoolSensorDescription(
         key="pool_usage_percent",
-        name="Usage",
         translation_key="pool_usage_percent",
         native_unit_of_measurement=_PERCENTAGE_UNIT,
         state_class=SensorStateClass.MEASUREMENT,
@@ -262,20 +257,17 @@ POOL_SENSOR_TYPES: tuple[PoolSensorDescription, ...] = (
     ),
     PoolSensorDescription(
         key="pool_raid_level",
-        name="RAID Level",
         translation_key="pool_raid_level",
         value_fn=lambda pool: _pool_raid_level(pool),
     ),
     PoolSensorDescription(
         key="pool_drive_count",
-        name="Drive Count",
         translation_key="pool_drive_count",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda pool: _pool_drive_count(pool),
     ),
     PoolSensorDescription(
         key="pool_rebuild_progress",
-        name="Rebuild Progress",
         translation_key="pool_rebuild_progress",
         native_unit_of_measurement=_PERCENTAGE_UNIT,
         state_class=SensorStateClass.MEASUREMENT,
@@ -285,7 +277,6 @@ POOL_SENSOR_TYPES: tuple[PoolSensorDescription, ...] = (
     ),
     PoolSensorDescription(
         key="pool_sync_progress",
-        name="Sync Progress",
         translation_key="pool_sync_progress",
         native_unit_of_measurement=_PERCENTAGE_UNIT,
         state_class=SensorStateClass.MEASUREMENT,
@@ -295,14 +286,12 @@ POOL_SENSOR_TYPES: tuple[PoolSensorDescription, ...] = (
     ),
     PoolSensorDescription(
         key="pool_at_risk_drive_count",
-        name="At-Risk Drive Count",
         translation_key="pool_at_risk_drive_count",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda pool: _pool_at_risk_drive_count(pool),
     ),
     PoolSensorDescription(
         key="pool_average_drive_temperature",
-        name="Average Drive Temperature",
         translation_key="pool_average_drive_temperature",
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
@@ -326,13 +315,11 @@ class DriveSensorDescription(SensorEntityDescription):  # type: ignore[misc]
 DRIVE_SENSOR_TYPES: tuple[DriveSensorDescription, ...] = (
     DriveSensorDescription(
         key="drive_status",
-        name="Status",
         translation_key="drive_status",
         value_fn=lambda drive: _drive_health(drive),
     ),
     DriveSensorDescription(
         key="drive_temperature",
-        name="Temperature",
         translation_key="drive_temperature",
         device_class=SensorDeviceClass.TEMPERATURE,
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
@@ -342,7 +329,6 @@ DRIVE_SENSOR_TYPES: tuple[DriveSensorDescription, ...] = (
     ),
     DriveSensorDescription(
         key="drive_power_on_hours",
-        name="Power-On Hours",
         translation_key="drive_power_on_hours",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda drive: _drive_power_on_hours(drive),

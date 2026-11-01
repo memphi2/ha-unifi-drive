@@ -50,7 +50,6 @@ class UnifiUnasSnapshotEnabledSwitch(
             entry,
             target,
             entity_key="enabled",
-            name_suffix="Snapshots",
         )
 
     @property

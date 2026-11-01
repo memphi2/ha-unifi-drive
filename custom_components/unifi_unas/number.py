@@ -61,7 +61,6 @@ class UnifiUnasSnapshotLimitNumber(
             entry,
             target,
             entity_key="limit",
-            name_suffix="Snapshot Limit",
         )
 
     @property
@@ -111,7 +110,6 @@ class UnifiUnasSnapshotMonthlyDayNumber(
             entry,
             target,
             entity_key="month_day",
-            name_suffix="Snapshot Month Day",
         )
 
     @property

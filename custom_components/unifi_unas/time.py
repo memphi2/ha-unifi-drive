@@ -53,7 +53,6 @@ class UnifiUnasSnapshotScheduleTime(
             entry,
             target,
             entity_key="schedule_time",
-            name_suffix="Snapshot Schedule Time",
         )
 
     @property

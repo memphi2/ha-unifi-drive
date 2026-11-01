@@ -171,6 +171,16 @@ class _ControlIntegrationClient:
         return None
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language,suffix", [("en", "Run backup"), ("de", "Backup starten")])
+async def test_backup_task_name_is_translated(hass, language, suffix):
+    """Backup labels use the platform translation without changing unique IDs."""
+    hass.config.language = language
+    entry = await _async_setup_control_entry(hass, _ControlIntegrationClient())
+    entity_id = _entity_id_for_unique_id(hass, entry, "device-1_backup_task-1")
+    assert hass.states.get(entity_id).attributes["friendly_name"] == f"UNAS Nightly Backup {suffix}"
+
+
 async def _async_setup_control_entry(hass, client, **data_overrides: Any):
     """Patch network calls and initialize the integration."""
     from homeassistant.setup import async_setup_component
