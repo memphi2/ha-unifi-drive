@@ -6,8 +6,8 @@ rules:
     status: done
     comment: Coordinator polling enforces a practical local API interval.
   brands:
-    status: done
-    comment: HACS metadata stays self-contained and no official vendor assets are bundled.
+    status: todo
+    comment: The custom-integration icon exists in home-assistant/brands; a complete icon/logo set meeting the Core brands rule has not been verified. HACS metadata and asset hygiene alone do not establish compliance.
   common-modules:
     status: done
     comment: API, discovery, diagnostics, storage, snapshot and entity helpers are split.
@@ -65,7 +65,7 @@ rules:
     comment: Services and control entities raise HA exceptions on failures.
   config-entry-unloading:
     status: done
-    comment: Unload removes platforms, runtime data and dynamic snapshot tracking.
+    comment: Unload removes platforms, runtime data and dynamic snapshot tracking. HA-backed repeated lifecycle tests verify session closure, listener cleanup and coordinator collection; failed and cancelled setup are covered too.
   docs-configuration-parameters:
     status: done
     comment: README documents setup and feature options.
@@ -138,7 +138,7 @@ rules:
     comment: Noisy detailed telemetry is disabled by default.
   entity-translations:
     status: done
-    comment: Entity names are translated through strings.json and en.json.
+    comment: Static and dynamic entity names use translations, with target/pool/drive/task placeholders. English and German HA tests and placeholder-parity validation cover the dynamic names.
   exception-translations:
     status: done
     comment: User-facing service and entity action errors use translation keys.

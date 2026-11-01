@@ -11,8 +11,8 @@ The release owner must complete the gates below on the final PR commit.
 - Marketplace guidance and the NAS/server category are present.
 - `DeviceInfo` supports attributes and the legacy dictionary representation;
   missing values preserve registry metadata and unchanged values avoid writes.
-- Quality-scale statuses document the remaining flow-coverage, availability,
-  per-module coverage and typing gaps; this work does not claim certification.
+- Quality-scale statuses document the remaining Core branding, flow-coverage,
+  availability, per-module coverage and typing gaps; this work does not claim certification.
 - Release publication depends on the same complete validation used for PRs.
 - Routine Actions/CI-tool updates are quarterly and grouped; security updates
   remain separate. Weekly validation and the HA minimum leg remain required.

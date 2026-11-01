@@ -203,8 +203,8 @@ Core monitoring is mature beta, discovery is hardened beta, and snapshot
 inventory is beta. Local controls remain experimental.
 
 Development is Platinum-oriented, but full Bronze/Silver/Gold compliance is not
-claimed. Flow coverage, per-module coverage, cached sensor availability and strict
-typing still have documented gaps in
+claimed. Core branding verification, flow coverage, per-module coverage, cached
+sensor availability and strict typing still have documented gaps in
 [quality_scale.yaml](custom_components/unifi_unas/quality_scale.yaml) and the
 [quality roadmap](docs/platinum_readiness.md). This is not official Home Assistant
 Core certification.

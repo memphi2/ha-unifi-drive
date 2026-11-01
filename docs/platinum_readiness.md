@@ -14,12 +14,13 @@ Home Assistant tier.
 | Snapshot inventory | Beta; bounded previews, throttled reads and separate failed-read/missing-target handling. |
 | Local controls | Experimental; firmware and account permissions determine support. Writes require explicit user actions. |
 | Lifecycle and privacy | Runtime ownership, unload cleanup, temporary-session cleanup, redirect boundaries and diagnostics redaction are tested. |
-| Performance | Entity normalization is cached only for the current refresh. Optional polling has a ten-second budget. Large preview attributes are not recorded. |
+| Performance | Entity normalization is cached only for the current refresh. Metadata reads have separate 2.5-second timeouts and optional controls share a ten-second budget. Large previews and duplicate control counts are not recorded as attributes; live changes can still produce state rows. |
 
 ## Open Quality Rules
 
 | Rule | Remaining work |
 | --- | --- |
+| brands | Custom-integration icons exist in the external brands repository, but the full Core icon/logo requirement is not verified. Asset hygiene and HACS metadata are separate concerns. |
 | config-flow-test-coverage | Complete HA-driven tests of every setup, options, reauth and reconfigure branch. Helper coverage alone is insufficient. |
 | entity-unavailable | Monitoring intentionally retains last-known readings while Device online reports offline. This does not fully satisfy HA's sensor availability rule. Keep WOL usable and resolve this as an explicit compatibility decision. |
 | test-coverage | CI enforces 95% aggregate line coverage. HA requires more than 95% per module; close the gaps with behavior tests, not exclusions. |
@@ -28,6 +29,19 @@ Home Assistant tier.
 Rule references: [flow coverage](https://contributors.home-assistant.io/core/quality-scale/config-flow-test-coverage/),
 [availability](https://contributors.home-assistant.io/core/quality-scale/entity-unavailable/),
 [test coverage](https://contributors.home-assistant.io/core/quality-scale/test-coverage/).
+
+## Regression Evidence
+
+- Ambiguous snapshot write errors stop immediately; only HTTP 404/405 permits
+  endpoint fallback. No destructive snapshot action has been added.
+- Malformed or partial snapshot settings preserve cached targets rather than
+  generating false missing-target repairs.
+- HA-backed tests exercise ten full setup/unload cycles with real HA-managed
+  sessions, checking listener cleanup and collection of old coordinators.
+  Repeated failed/cancelled setups are covered separately.
+- English/German entity tests cover dynamic labels and stable registry identity.
+- Recorder serializer tests retain live counts while verifying stable recorded
+  control attributes across twenty count changes. This is not a live DB-rate test.
 
 ## Recommended Work Order
 

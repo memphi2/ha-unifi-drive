@@ -2,6 +2,13 @@
 
 ## v0.8.9 - HA 2026.11 and Marketplace preparation
 
+- Stops snapshot write retries after ambiguous failures, rejects malformed target
+  lists and cleans runtime/listeners when setup is cancelled.
+- Bounds system/network metadata reads, omits duplicate snapshot control counts
+  from recorded attributes and translates dynamic entity labels without changing
+  existing unique IDs. Live-only attribute changes can still create state rows.
+- Removes raw payload keys and rejected private paths from audit/debug output;
+  adds repeated HA lifecycle and translation-placeholder regression coverage.
 - Hardens HTTP redirect boundaries and error privacy, and releases temporary
   config-flow sessions after success, failure or cancellation.
 - Serializes snapshot settings updates against fresh target data and prevents
