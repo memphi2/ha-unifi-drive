@@ -258,6 +258,13 @@ def test_snapshot_target_entity_tracks_missing_target_lifecycle() -> None:
         )
 
         missing_snapshots = []
+        coordinator.snapshot_settings_available = False
+        for _ in range(3):
+            coordinator.snapshot_settings = []
+            snapshot_entities_module._update_snapshot_target_missing_state(coordinator, _FakeEntry())
+        assert entity._snapshot_target_missing_count == 0
+        assert repair_calls == []
+        coordinator.snapshot_settings_available = True
         for expected_count in (1, 2, 3):
             snapshot_settings = []
             missing_snapshots.append(snapshot_settings)

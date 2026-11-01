@@ -831,6 +831,40 @@ def test_snapshot_inventory_refresh_runtime_errors_preserve_refresh_request() ->
     assert coordinator.snapshot_inventory == {}
 
 
+def test_snapshot_settings_transient_errors_preserve_targets_and_recover() -> None:
+    """Failed reads must retain the last target list without advancing missing counts."""
+    target = {"id": "target-1", "type": "shared"}
+
+    class Client:
+        snapshot_settings_read_supported = True
+        fail = True
+
+        async def async_get_snapshot_settings(self):
+            if self.fail:
+                raise coordinator_module.CannotConnect("HTTP 503")
+            return [target]
+
+    client = Client()
+    coordinator = coordinator_module.UnifiUnasCoordinator(
+        types.SimpleNamespace(), client, _FakeSnapshotPollingEntry()
+    )
+    cached = [target]
+    coordinator.snapshot_settings = cached
+    coordinator._async_refresh_snapshot_inventory_if_due = _noop_refresh
+    for _ in range(3):
+        asyncio.run(coordinator._refresh_snapshot_settings())
+        assert coordinator.snapshot_settings is cached
+        assert coordinator.snapshot_settings_available is False
+    client.fail = False
+    asyncio.run(coordinator._refresh_snapshot_settings())
+    assert coordinator.snapshot_settings_available is True
+    assert coordinator.snapshot_settings == [target]
+
+
+async def _noop_refresh():
+    """Avoid inventory requests when testing the settings state machine."""
+
+
 def test_snapshot_settings_connection_failures_do_not_create_repairs() -> None:
     """Powered-off/offline devices should not create snapshot repair issues."""
     original_create_issue = coordinator_module.async_create_snapshot_read_issue

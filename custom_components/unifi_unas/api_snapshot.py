@@ -7,7 +7,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
-from .api_errors import InvalidAuth, UnexpectedResponse, UnsupportedFeature
+from .api_errors import CannotConnect, InvalidAuth, UnexpectedResponse, UnsupportedFeature
 from .const import (
     DEFAULT_SNAPSHOT_LIMIT,
     MAX_SNAPSHOT_LIMIT,
@@ -288,12 +288,9 @@ class ApiSnapshotMixin:
             self._snapshot_settings_read_supported = False
             return []
         if status < 200 or status >= 300:
-            _LOGGER.debug(
-                "Snapshot settings endpoint %s returned HTTP %s",
-                SNAPSHOT_SETTINGS_PATH,
-                status,
+            raise CannotConnect(
+                f"Snapshot settings could not be read (HTTP {status}). Retry later."
             )
-            return []
 
         self._snapshot_settings_read_supported = True
         current_user_id = self._current_user_id()

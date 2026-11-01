@@ -143,6 +143,8 @@ def _update_snapshot_target_missing_state(
     entry: UnifiDriveConfigEntry,
 ) -> None:
     """Track snapshot targets that disappeared without deleting their entities."""
+    if not getattr(coordinator, "snapshot_settings_available", True):
+        return
     current_targets = tuple(
         target
         for target in getattr(coordinator, "snapshot_settings", ())
@@ -250,6 +252,7 @@ class UnifiUnasSnapshotTargetEntity(
         return (
             bool(super().available)
             and self.coordinator.is_device_online
+            and getattr(self.coordinator, "snapshot_settings_available", True)
             and self._current_target() is not None
         )
 

@@ -1284,8 +1284,8 @@ def test_snapshot_settings_read_returns_targets_and_current_user() -> None:
     assert client.snapshot_settings_read_supported is True
 
 
-def test_snapshot_settings_read_logs_empty_shapes_and_ignores_server_errors() -> None:
-    """Snapshot settings read should stay quiet and non-fatal for bad payloads."""
+def test_snapshot_settings_read_distinguishes_empty_targets_from_server_errors() -> None:
+    """Server failures must not be mistaken for a successful empty target list."""
     client = SnapshotWriteClient()
     client._snapshot_settings_read_supported = None
     client._login_data = {}
@@ -1294,7 +1294,8 @@ def test_snapshot_settings_read_logs_empty_shapes_and_ignores_server_errors() ->
     assert client.snapshot_settings_read_supported is True
 
     client.responses = [(500, {"error": "server"})]
-    assert asyncio.run(client._async_get_snapshot_settings_once()) == []
+    with pytest.raises(api_snapshot_module.CannotConnect, match="HTTP 500"):
+        asyncio.run(client._async_get_snapshot_settings_once())
 
 
 def test_snapshot_wrapper_methods_retry_once_after_invalid_auth() -> None:

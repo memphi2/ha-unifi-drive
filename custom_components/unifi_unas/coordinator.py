@@ -83,6 +83,7 @@ class UnifiUnasCoordinator(DataUpdateCoordinator[dict[str, Any]]):  # type: igno
         self.fan_mode: str | None = None
         self.backup_tasks: list[dict[str, Any]] = []
         self.snapshot_settings: list[dict[str, Any]] = []
+        self.snapshot_settings_available = False
         self.snapshot_inventory: dict[str, dict[str, Any]] = {}
         self.snapshot_inventory_errors: dict[str, str] = {}
         self.snapshot_inventory_skip_reasons: dict[str, str] = {}
@@ -224,7 +225,7 @@ class UnifiUnasCoordinator(DataUpdateCoordinator[dict[str, Any]]):  # type: igno
     async def _refresh_snapshot_settings(self) -> None:
         """Refresh snapshot settings and trigger inventory refresh if possible."""
         try:
-            self.snapshot_settings = await self.client.async_get_snapshot_settings()
+            settings = await self.client.async_get_snapshot_settings()
         except (
             CannotConnect,
             InvalidAuth,
@@ -238,9 +239,14 @@ class UnifiUnasCoordinator(DataUpdateCoordinator[dict[str, Any]]):  # type: igno
             )
             if not isinstance(err, CannotConnect):
                 async_create_snapshot_read_issue(self.hass, self.config_entry, err)
-            self._clear_snapshot_settings_state(clear_issues=False)
+            self.snapshot_settings_available = False
             return
 
+        self.snapshot_settings_available = self.client.snapshot_settings_read_supported is not False
+        if not self.snapshot_settings_available:
+            async_update_snapshot_read_issue(self.hass, self.config_entry, supported=False)
+            return
+        self.snapshot_settings = settings
         await self._async_refresh_snapshot_inventory_if_due()
         async_update_snapshot_read_issue(
             self.hass,
@@ -251,6 +257,7 @@ class UnifiUnasCoordinator(DataUpdateCoordinator[dict[str, Any]]):  # type: igno
     def _clear_snapshot_settings_state(self, *, clear_issues: bool = True) -> None:
         """Clear cached snapshot state and optionally clear snapshot repairs."""
         self.snapshot_settings = []
+        self.snapshot_settings_available = False
         self.snapshot_inventory = {}
         self.snapshot_inventory_errors = {}
         self.snapshot_inventory_skip_reasons = {}
