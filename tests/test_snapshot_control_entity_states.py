@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-import sys
 from typing import Any
 from unittest.mock import patch
 
 import pytest
+
+from tests.ha_test_helpers import (
+    ROOT,
+    ensure_repo_custom_components_path as _ensure_repo_custom_components_path,
+)
 
 try:
     from homeassistant.const import (
@@ -30,34 +33,10 @@ except (ImportError, AttributeError):
     CONF_VERIFY_SSL = "verify_ssl"
 
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-CUSTOM_COMPONENTS = str(ROOT / "custom_components")
-
-
 @pytest.fixture
 def hass_config_dir() -> str:
     """Point Home Assistant at this repository's test config directory."""
     return str(ROOT)
-
-
-@pytest.fixture(autouse=True)
-def _enable_custom_integrations(enable_custom_integrations) -> None:
-    """Allow Home Assistant to load the integration from local custom components."""
-    _ensure_repo_custom_components_path()
-
-
-def _ensure_repo_custom_components_path() -> None:
-    """Keep Home Assistant loading this repository's integration path."""
-    import custom_components
-
-    if not hasattr(custom_components, "__path__"):
-        custom_components.__path__ = [str(ROOT / "custom_components")]
-
-    if CUSTOM_COMPONENTS not in custom_components.__path__:
-        custom_components.__path__.append(CUSTOM_COMPONENTS)
 
 
 def _entry_data(

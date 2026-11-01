@@ -3,37 +3,21 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
-import sys
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-CUSTOM_COMPONENTS = str(ROOT / "custom_components")
-
-
-def _ensure_repo_custom_components_path() -> None:
-    """Keep Home Assistant's test package from shadowing this integration."""
-    import custom_components
-
-    if CUSTOM_COMPONENTS not in custom_components.__path__:
-        custom_components.__path__.append(CUSTOM_COMPONENTS)
+from tests.ha_test_helpers import (
+    ROOT,
+    ensure_repo_custom_components_path as _ensure_repo_custom_components_path,
+)
 
 
 @pytest.fixture
 def hass_config_dir() -> str:
     """Point Home Assistant at this repository's test config directory."""
     return str(ROOT)
-
-
-@pytest.fixture(autouse=True)
-def _enable_custom_integrations(enable_custom_integrations) -> None:
-    """Allow Home Assistant to load the integration from custom_components."""
 
 
 def _entry_data(*, wol_enabled: bool = False) -> dict[str, object]:

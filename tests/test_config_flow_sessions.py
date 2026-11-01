@@ -3,21 +3,21 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+
+from tests.ha_test_helpers import ensure_repo_custom_components_path
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("outcome", ["success", "connection", "auth", "invalid", "cancel"])
 async def test_validation_detaches_sessions_on_every_exit(hass, monkeypatch, outcome: str) -> None:
     from aiohttp import ThreadedResolver
-    import custom_components
     from homeassistant.helpers import aiohttp_client
     from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
-    custom_components.__path__.append(str(Path(__file__).resolve().parents[1] / "custom_components"))
+    ensure_repo_custom_components_path()
     from custom_components.unifi_unas import config_flow_validation as validation
     from custom_components.unifi_unas.api import CannotConnect, InvalidAuth, UnexpectedResponse
 
