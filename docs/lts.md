@@ -18,6 +18,46 @@ The validation workflow must cover:
 If the HACS minimum version is raised, the change must be made deliberately and
 must be reflected in CI, release notes and user-facing documentation.
 
+## Dependency Maintenance Cadence
+
+Routine tool updates are reviewed quarterly, with at most one open version-update
+PR for GitHub Actions and one for Python CI tools. Each ecosystem uses a single
+Dependabot group. Action references remain pinned to commit SHAs.
+
+`requirements/ci/requirements.txt` is the only maintained manifest for the direct
+CI tools Ruff, Mypy and Bandit. Its versions must work on both Python matrix legs.
+It is a hand-maintained direct-dependency list, not a generated environment lock:
+do not put `pip freeze` output, transitive dependencies, HA, its test helper or
+remote HA constraint includes into it. Dependabot's pip job is scoped to that
+directory. CI installs the file together with the matrix's HA/helper pair and
+that HA release's constraints, then runs `pip check`.
+
+The bootstrap pip comes from the selected Python environment; CI no longer
+upgrades it to the latest release on every run. Transitive tool dependencies are
+not fully locked, so the weekly validation remains important. Repository tests
+guard the direct-only manifest, update cadence and security-update separation.
+
+Security fixes are exceptions to the quarterly schedule: triage alerts promptly
+and handle security PRs separately, without waiting for a routine update bundle.
+Dependabot alerts and automatic security updates must remain enabled on GitHub.
+The version-update PR limit does not cap security PRs; GitHub manages their
+separate limit. Do not add blanket ignores or redirect Dependabot to a non-default
+branch, which would change how security configuration applies.
+
+Dependabot can only fix dependencies it recognizes. This tool manifest does not
+claim full security coverage of HA's resolved environment or the integration's
+runtime requirements in `manifest.json`. Review upstream HA/runtime advisories
+and resolve applicable vulnerabilities through a tested compatibility update.
+
+Compatibility checks still run weekly and on branch pushes/PRs. Review new HA
+releases and announced API removals separately from routine tooling updates.
+Change HA and its matching test helper together, keep the minimum-version leg,
+and address required Python/HA migrations before their deadlines. Security and
+compatibility fixes must not wait for the next quarter.
+
+References: [Dependabot schedule and PR limits](https://docs.github.com/en/code-security/reference/supply-chain-security/dependabot-options-reference),
+[security updates](https://docs.github.com/en/code-security/how-tos/secure-your-supply-chain/secure-your-dependencies/configure-security-updates).
+
 ## November 2026 Compatibility Review
 
 Reviewed on `2026-11-01`. Home Assistant `2026.11` is still a beta at this review

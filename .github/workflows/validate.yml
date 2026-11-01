@@ -64,19 +64,12 @@ jobs:
 
       - name: Install test dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install \
+          python -m pip install \
             -c "https://raw.githubusercontent.com/home-assistant/core/${{ matrix.homeassistant }}/homeassistant/package_constraints.txt" \
+            -r requirements/ci/requirements.txt \
             "homeassistant==${{ matrix.homeassistant }}" \
             "pytest-homeassistant-custom-component==${{ matrix.pytest_homeassistant }}" \
-            pytest \
-            aiohttp \
-            "josepy<2.0; python_version < '3.13'" \
-            ruff \
-            bandit \
-            coverage \
-            mypy \
-            packaging
+            "josepy<2.0; python_version < '3.13'"
           python -m pip check
 
       - name: Verify Home Assistant test version

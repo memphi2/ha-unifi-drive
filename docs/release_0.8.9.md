@@ -13,6 +13,8 @@ The release owner must complete the gates below on the final PR commit.
   missing values preserve registry metadata and unchanged values avoid writes.
 - Quality-scale statuses are unchanged; this work does not claim certification.
 - Release publication depends on the same complete validation used for PRs.
+- Routine Actions/CI-tool updates are quarterly and grouped; security updates
+  remain separate. Weekly validation and the HA minimum leg remain required.
 
 ## Required Before Release
 
@@ -45,7 +47,8 @@ The release owner must complete the gates below on the final PR commit.
 
 | Gate | Evidence |
 | --- | --- |
-| HA 2026.10.0 / Python 3.14.4 / helper 0.13.371 | 567 tests passed, no skips; coverage 95.72%; `pip check`, Ruff, Mypy, Bandit, repository checks and compileall passed |
+| HA 2024.8.0 / Python 3.12.13 / helper 0.13.152 | 571 tests passed, no skips; coverage 95.18%; `pip check`, Ruff, Mypy, Bandit and compileall passed with the pinned CI tools |
+| HA 2026.10.0 / Python 3.14.4 / helper 0.13.371 | 571 tests passed, no skips; coverage 95.72%; `pip check`, Ruff, Mypy, Bandit, repository checks and compileall passed with the pinned CI tools |
 | Public surfaces and archive | Existing public GitHub surfaces and locally built release ZIP passed the automated privacy/legal/layout audit |
 | Stable HA 2026.11 / matching test helper | Pending upstream release and full test run |
 | November `DeviceInfo` | Focused check against actual HA `2026.11.0b1` passed; not a full compatibility result |

@@ -18,6 +18,9 @@
   rejects tags that do not match the integration version.
 - Resolves the pinned HA runtime and test helper together and checks installed
   dependencies instead of excluding the helper's Home Assistant requirement.
+- Bundles routine Action and pinned Python CI-tool updates quarterly, with one
+  open version-update PR per ecosystem. Security updates remain separate and
+  weekly compatibility checks continue unchanged.
 
 Release is held until the final HA `2026.11` compatibility and Marketplace checks
 in [the release checklist](docs/release_0.8.9.md) are complete.

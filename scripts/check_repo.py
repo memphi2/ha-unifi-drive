@@ -40,6 +40,7 @@ VALIDATE_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "validate.yml"
 RELEASE_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "release.yml"
 RELEASE_ZIP_CHECK_PATH = ROOT / "scripts" / "check_release_zip.py"
 GITHUB_SURFACE_AUDIT_PATH = ROOT / "scripts" / "audit_github_public_surfaces.py"
+CI_TOOL_REQUIREMENTS_PATH = ROOT / "requirements" / "ci" / "requirements.txt"
 
 QUALITY_RULES_BY_TIER = {
     "bronze": (
@@ -246,7 +247,7 @@ INSTALLATION_DOC_MARKERS = (
 )
 
 MOJIBAKE_MARKERS = ("\u00c3", "\u00c2", "\u00e2\u20ac", "\ufffd")
-TEXT_GLOBS = ("*.md", "*.json", "*.py", "*.yml", "*.yaml", "*.ini", "*.example")
+TEXT_GLOBS = ("*.md", "*.json", "*.py", "*.yml", "*.yaml", "*.ini", "*.example", "*.txt")
 IGNORED_DIRS = {
     ".git",
     ".mypy_cache",
@@ -1360,6 +1361,7 @@ def main() -> None:
     ensure_file(RELEASE_WORKFLOW_PATH)
     ensure_file(RELEASE_ZIP_CHECK_PATH)
     ensure_file(GITHUB_SURFACE_AUDIT_PATH)
+    ensure_file(CI_TOOL_REQUIREMENTS_PATH)
 
     check_all_text_files_for_mojibake()
     check_legal_docs()
