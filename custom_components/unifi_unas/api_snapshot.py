@@ -363,6 +363,10 @@ class ApiSnapshotMixin:
             return
 
         if last_error is not None:
+            self._set_snapshot_capability(
+                "_snapshot_create_supported", "_snapshot_create_supported_by_type",
+                target_type, False,
+            )
             raise last_error
         raise UnsupportedFeature("Manual snapshot endpoint is not configured.")
 
@@ -385,6 +389,10 @@ class ApiSnapshotMixin:
                 continue
 
         if last_error is not None:
+            self._set_snapshot_capability(
+                "_snapshot_inventory_supported", "_snapshot_inventory_supported_by_type",
+                target_type, False,
+            )
             raise last_error
         raise UnsupportedFeature("Snapshot inventory endpoint is not configured.")
 
@@ -411,16 +419,10 @@ class ApiSnapshotMixin:
             return inventory
 
         if status in SNAPSHOT_ENDPOINT_UNAVAILABLE_HTTP_STATUSES:
-            self._set_snapshot_capability(
-                "_snapshot_inventory_supported",
-                "_snapshot_inventory_supported_by_type",
-                target_type,
-                False,
-            )
             raise UnsupportedFeature(
                 "Snapshot inventory endpoint is not available on this system."
             )
-        raise UnsupportedFeature(
+        raise CannotConnect(
             f"Snapshot inventory endpoint returned HTTP {status}: "
             f"{safe_response_summary(payload)}"
         )
@@ -448,12 +450,6 @@ class ApiSnapshotMixin:
             return
 
         if status in SNAPSHOT_ENDPOINT_UNAVAILABLE_HTTP_STATUSES:
-            self._set_snapshot_capability(
-                "_snapshot_create_supported",
-                "_snapshot_create_supported_by_type",
-                target_type,
-                False,
-            )
             raise UnsupportedFeature(
                 "Manual snapshot endpoint is not available on this system."
             )

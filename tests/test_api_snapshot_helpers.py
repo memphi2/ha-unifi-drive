@@ -1183,7 +1183,7 @@ def test_snapshot_inventory_and_write_errors_are_sanitized() -> None:
         (500, {"token": "secret-token", "message": "Authorization: Bearer raw-token"})
     ]
 
-    with pytest.raises(api_snapshot_module.UnsupportedFeature) as err:
+    with pytest.raises(api_snapshot_module.CannotConnect) as err:
         asyncio.run(client._async_get_snapshot_inventory_once("/inventory"))
     assert "secret-token" not in str(err.value)
     assert "raw-token" not in str(err.value)
@@ -1455,7 +1455,7 @@ def test_snapshot_create_405_marks_endpoint_unsupported() -> None:
 
     try:
         asyncio.run(
-            client._async_create_snapshot_once(
+            client._async_create_snapshot_with_paths(
                 "/proxy/drive/api/v1/snapshots/shared/Shared_Drive",
                 {"description": "", "locked": False},
             )
@@ -1474,8 +1474,8 @@ def test_snapshot_inventory_405_marks_endpoint_unsupported() -> None:
 
     try:
         asyncio.run(
-            client._async_get_snapshot_inventory_once(
-                "/proxy/drive/api/v1/snapshots/shared/Shared_Drive",
+            client._async_get_snapshot_inventory_with_paths(
+                ("/proxy/drive/api/v1/snapshots/shared/Shared_Drive",),
             )
         )
     except api_snapshot_module.UnsupportedFeature:
@@ -1484,6 +1484,25 @@ def test_snapshot_inventory_405_marks_endpoint_unsupported() -> None:
         raise AssertionError("405 should raise UnsupportedFeature")
 
     assert client._snapshot_inventory_supported is False
+
+
+@pytest.mark.parametrize("operation", ["create", "inventory"])
+@pytest.mark.parametrize("known_support", [None, True])
+def test_snapshot_alias_failure_preserves_capability_and_recovers(operation, known_support):
+    """A missing alias followed by a transient failure is not unsupported."""
+    client = SnapshotWriteClient()
+    flag = f"_snapshot_{operation}_supported_by_type"
+    if known_support is not None:
+        getattr(client, flag)["shared"] = known_support
+    target = {"id": "shared-id", "type": "shared", "shared_drive_name": "Example"}
+    action = client.async_create_snapshot_target if operation == "create" else client.async_get_snapshot_inventory_target
+    client.responses = [(404, {}), (500, {})]
+    with pytest.raises(api_snapshot_module.CannotConnect):
+        asyncio.run(action(target))
+    assert getattr(client, flag).get("shared") is known_support
+    client.responses = [(404, {}), (200, [])]
+    asyncio.run(action(target))
+    assert getattr(client, flag)["shared"] is True
 
 
 def test_snapshot_capability_helpers_handle_missing_flags_and_unknown_user() -> None:
