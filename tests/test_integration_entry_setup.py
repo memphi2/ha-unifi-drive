@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import gc
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
+from weakref import ref
 
 import pytest
 
@@ -393,6 +395,60 @@ async def test_setup_and_unload_entry_stores_and_removes_coordinator(hass) -> No
 
     assert entry.entry_id not in hass.data.get(DOMAIN, {})
     assert getattr(entry, "runtime_data", None) is None
+
+
+@pytest.mark.asyncio
+async def test_repeated_entry_lifecycle_releases_sessions_entities_and_coordinators(hass, monkeypatch):
+    """Real platform cycles must release owned resources, not just runtime mirrors."""
+    from aiohttp import ThreadedResolver
+    from homeassistant.helpers import aiohttp_client
+    from homeassistant.setup import async_setup_component
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.unifi_unas.const import (
+        DOMAIN, CONF_FAN_CONTROL_ENABLED, CONF_SNAPSHOT_BUTTONS_ENABLED,
+    )
+    from custom_components.unifi_unas.snapshot_entities import _SNAPSHOT_TARGET_ENTITIES
+    from tests.test_snapshot_control_entity_states import (
+        _SnapshotIntegrationClient, _snapshot_target_with_controls,
+    )
+
+    if hasattr(aiohttp_client, "AsyncResolver"):
+        monkeypatch.setattr(aiohttp_client, "AsyncResolver", ThreadedResolver)
+    assert await async_setup_component(hass, DOMAIN, {})
+    entry = MockConfigEntry(
+        domain=DOMAIN, title="UNAS", unique_id="cycle-device",
+        data={**_entry_data(), CONF_SNAPSHOT_BUTTONS_ENABLED: True, CONF_FAN_CONTROL_ENABLED: False},
+    )
+    entry.add_to_hass(hass)
+    sessions = []
+    coordinators = []
+    listener_counts = []
+
+    def create_client(session, **kwargs):
+        sessions.append(session)
+        return _SnapshotIntegrationClient([_snapshot_target_with_controls()])
+
+    with patch("custom_components.unifi_unas.UnifiUnasApiClient", side_effect=create_client):
+        for _ in range(10):
+            assert await hass.config_entries.async_setup(entry.entry_id)
+            await hass.async_block_till_done()
+            coordinator = entry.runtime_data
+            coordinators.append(ref(coordinator))
+            listener_counts.append(len(coordinator._listeners))
+            assert await hass.config_entries.async_unload(entry.entry_id)
+            await hass.async_block_till_done()
+            assert not coordinator._listeners
+            assert coordinator not in _SNAPSHOT_TARGET_ENTITIES
+            assert not entry.update_listeners
+            assert entry.entry_id not in hass.data.get(DOMAIN, {})
+            assert sessions[-1].closed
+            del coordinator
+    await hass.async_block_till_done()
+    gc.collect()
+    assert len(set(listener_counts)) == 1
+    assert all(item() is None for item in coordinators)
+    assert all(session.closed for session in sessions)
 
 
 @pytest.mark.asyncio
