@@ -18,8 +18,8 @@ from repo_hygiene import (  # noqa: E402
     OFFICIAL_VENDOR_ASSET_PATH_PATTERNS,
     PROPRIETARY_VENDOR_CONTENT_PATTERNS,
     SECRET_PATH_PATTERNS,
-    SECRET_PATTERNS,
     _path_matches_any,
+    content_scan_issues,
     fail,
     local_identifier_issues,
     ok,
@@ -106,10 +106,7 @@ def _release_zip_issues(zip_path: Path) -> list[str]:
                 if b"\0" in data[:4096]:
                     continue
 
-                for label, pattern in SECRET_PATTERNS:
-                    if pattern.search(data):
-                        issues.append(f"{member}: possible {label}")
-                        break
+                issues.extend(content_scan_issues(member, data))
 
                 for label, pattern in PROPRIETARY_VENDOR_CONTENT_PATTERNS:
                     if pattern.search(data):

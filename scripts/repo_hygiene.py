@@ -9,7 +9,8 @@ import re
 
 
 FORBIDDEN_MARKERS_ENV = "UNIFI_UNAS_FORBIDDEN_MARKERS"
-SECRET_PATTERNS = (
+# Static finding labels and expressions, never captured credential values.
+_CONTENT_SCAN_RULES: tuple[tuple[str, re.Pattern[bytes]], ...] = (
     (
         "private key",
         re.compile(rb"-----BEGIN (?:RSA |OPENSSH |EC |DSA )?PRIVATE KEY-----"),
@@ -192,6 +193,14 @@ def local_identifier_issues(label: str, data: bytes) -> list[str]:
     return issues
 
 
+def content_scan_issues(label: str, data: bytes) -> list[str]:
+    """Return a static credential category without exposing matched content."""
+    for category, pattern in _CONTENT_SCAN_RULES:
+        if pattern.search(data):
+            return [f"{label}: possible {category}"]
+    return []
+
+
 def fail(message: str) -> None:
     """Print failure message and exit."""
     print(f"[FAIL] {message}")
@@ -241,10 +250,7 @@ def _tracked_file_hygiene_issues(root: Path, tracked_paths: list[str]) -> list[s
         if b"\0" in data[:4096]:
             continue
 
-        for label, pattern in SECRET_PATTERNS:
-            if pattern.search(data):
-                failures.append(f"{relative}: possible {label}")
-                break
+        failures.extend(content_scan_issues(relative, data))
 
         for label, pattern in PROPRIETARY_VENDOR_CONTENT_PATTERNS:
             if pattern.search(data):

@@ -23,8 +23,8 @@ from repo_hygiene import (  # noqa: E402
     OFFICIAL_VENDOR_ASSET_PATH_PATTERNS,
     PROPRIETARY_VENDOR_CONTENT_PATTERNS,
     SECRET_PATH_PATTERNS,
-    SECRET_PATTERNS,
     _path_matches_any,
+    content_scan_issues,
     fail,
     local_identifier_issues,
     ok,
@@ -68,11 +68,7 @@ def _gh_bytes(args: list[str]) -> bytes:
 
 def _scan_bytes(label: str, data: bytes) -> list[str]:
     """Return non-secret finding labels for text or asset content."""
-    issues: list[str] = []
-    for finding, pattern in SECRET_PATTERNS:
-        if pattern.search(data):
-            issues.append(f"{label}: possible {finding}")
-            break
+    issues = content_scan_issues(label, data)
 
     for finding, pattern in PROPRIETARY_VENDOR_CONTENT_PATTERNS:
         if pattern.search(data):
