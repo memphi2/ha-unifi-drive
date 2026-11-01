@@ -111,7 +111,9 @@ Versions before `0.8.0` must be removed and reinstalled; follow the
 
 ## Data Updates
 
-Monitoring uses local polling with a minimum interval of 30 seconds. Optional
+Monitoring uses local polling with a minimum interval of 30 seconds. System and
+network metadata reads each have a 2.5-second timeout; slow metadata cannot hold
+up a successful storage read for the full transport timeout. Optional
 polling shares a ten-second budget with time reserved for each enabled feature,
 so a slow endpoint cannot block later features or core updates indefinitely.
 Snapshot inventory normally refreshes every ten minutes. Larger batches resume

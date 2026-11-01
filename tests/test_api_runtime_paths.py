@@ -10,6 +10,7 @@ import pytest
 from tests.api_client_stubs import UnifiUnasApiClient
 
 from custom_components.unifi_unas import api_transport as api_transport_module
+from custom_components.unifi_unas import api_storage as api_storage_module
 from custom_components.unifi_unas.api import (
     CannotConnect,
     InvalidAuth,
@@ -367,6 +368,41 @@ def test_storage_read_tolerates_missing_system_metadata() -> None:
 
     assert data == {"storage": True}
     assert client._system_info is None
+
+
+@pytest.mark.parametrize("slow_paths", [
+    {"/api/system"}, {NETWORK_IO_PATH}, {"/api/system", NETWORK_IO_PATH},
+])
+def test_metadata_timeouts_do_not_delay_other_endpoints_and_recover(monkeypatch, slow_paths):
+    """A healthy storage read survives each stalled metadata endpoint."""
+    monkeypatch.setattr(api_storage_module, "_METADATA_REQUEST_TIMEOUT", 0.01)
+    client = _client(_Session())
+    client._authenticated = True
+    calls = []
+    slow = True
+
+    async def request(method, path):
+        calls.append(path)
+        if slow and path in slow_paths:
+            await asyncio.Event().wait()
+        if path.endswith("/storage"):
+            return {"storage": True}
+        return {"example": True}
+
+    client._request_json = request
+
+    async def exercise():
+        nonlocal slow
+        data = await asyncio.wait_for(client.async_get_storage(), timeout=1)
+        assert data["storage"] is True
+        assert ("_system" in data) == ("/api/system" not in slow_paths)
+        assert ("_network_io" in data) == (NETWORK_IO_PATH not in slow_paths)
+        assert calls[-2:] == ["/api/system", NETWORK_IO_PATH]
+        slow = False
+        recovered = await client.async_get_storage()
+        assert recovered["_system"] == recovered["_network_io"] == {"example": True}
+
+    asyncio.run(exercise())
 
 
 def test_system_power_actions_check_permission_and_retry_auth() -> None:
