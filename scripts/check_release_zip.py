@@ -12,7 +12,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from check_repo import (  # noqa: E402
+from repo_hygiene import (  # noqa: E402
     BRANDING_CLAIM_PATTERNS,
     GENERATED_ARTIFACT_PATH_PATTERNS,
     OFFICIAL_VENDOR_ASSET_PATH_PATTERNS,
