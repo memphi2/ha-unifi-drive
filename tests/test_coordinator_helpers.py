@@ -7,6 +7,8 @@ import logging
 import sys
 import types
 
+import pytest
+
 from tests.module_stubs import (
     install_homeassistant_const_stub,
     install_package_stubs,
@@ -899,6 +901,83 @@ def test_optional_polling_budget_publishes_core_data_and_recovers(monkeypatch) -
         assert not coordinator._optional_refresh_timed_out
         async with coordinator._optional_refresh_lock:
             await coordinator._async_refresh_optional_features()
+
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("stalled,fan_enabled", [("fan", True), ("backup", True), ("backup", False)])
+def test_optional_polling_reserves_time_for_later_features(monkeypatch, stalled, fan_enabled) -> None:
+    """An earlier timeout on every poll must not starve healthy later endpoints."""
+    monkeypatch.setattr(coordinator_module, "_OPTIONAL_REFRESH_TIMEOUT", 0.03)
+
+    class Client(_FakeStartupOptionalClient):
+        cancelled = 0
+
+        async def stall(self):
+            try:
+                await asyncio.Event().wait()
+            finally:
+                self.cancelled += 1
+
+        async def async_get_fan_mode(self):
+            if stalled == "fan":
+                await self.stall()
+            return await super().async_get_fan_mode()
+
+        async def async_get_backup_tasks(self):
+            if stalled == "backup":
+                await self.stall()
+            return await super().async_get_backup_tasks()
+
+    async def run():
+        client = Client()
+        coordinator = coordinator_module.UnifiUnasCoordinator(
+            types.SimpleNamespace(), client, _FakeSnapshotPollingEntry()
+        )
+        coordinator.fan_control_enabled = fan_enabled
+        for _ in range(3):
+            assert await asyncio.wait_for(coordinator._async_update_data(), 1) == {
+                "_system": {"status": "online"}
+            }
+            assert coordinator.snapshot_settings_available
+            assert coordinator._optional_refresh_timed_out
+            assert not coordinator._optional_refresh_lock.locked()
+        assert client.cancelled == 3
+        assert client.snapshot_settings_calls == 3
+        assert client.inventory_calls == ["shared-1"]
+        assert client.backup_calls == (3 if stalled == "fan" else 0)
+        assert client.fan_calls == (3 if fan_enabled and stalled != "fan" else 0)
+
+    asyncio.run(run())
+
+
+def test_cancelled_optional_polling_releases_lock_without_starting_more_reads(monkeypatch) -> None:
+    """Unload cancellation must propagate instead of being treated as a timeout."""
+    async def run():
+        client = _FakeStartupOptionalClient()
+        coordinator = coordinator_module.UnifiUnasCoordinator(
+            types.SimpleNamespace(), client, _FakeSnapshotPollingEntry()
+        )
+        coordinator.fan_control_enabled = True
+        started = asyncio.Event()
+        cancelled = asyncio.Event()
+
+        async def stall():
+            started.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+
+        monkeypatch.setattr(client, "async_get_fan_mode", stall)
+        task = asyncio.create_task(coordinator._async_refresh_optional_features())
+        await asyncio.wait_for(started.wait(), 1)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert cancelled.is_set()
+        assert not coordinator._optional_refresh_lock.locked()
+        assert client.backup_calls == client.snapshot_settings_calls == 0
 
     asyncio.run(run())
 

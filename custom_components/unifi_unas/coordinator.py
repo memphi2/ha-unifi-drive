@@ -157,15 +157,26 @@ class UnifiUnasCoordinator(DataUpdateCoordinator[dict[str, Any]]):  # type: igno
         if self._optional_refresh_lock.locked():
             return
         async with self._optional_refresh_lock:
-            try:
-                async with asyncio.timeout(_OPTIONAL_REFRESH_TIMEOUT):
-                    await self._refresh_fan_mode()
-                    await self._refresh_backup_tasks()
-                    if self.snapshot_buttons_enabled:
-                        await self._refresh_snapshot_settings()
-                    else:
-                        self._clear_snapshot_settings_state()
-            except TimeoutError:
+            refreshers = [self._refresh_backup_tasks]
+            if self.fan_control_enabled:
+                refreshers.insert(0, self._refresh_fan_mode)
+            if self.snapshot_buttons_enabled:
+                refreshers.append(self._refresh_snapshot_settings)
+            else:
+                self._clear_snapshot_settings_state()
+
+            loop = asyncio.get_running_loop()
+            deadline = loop.time() + _OPTIONAL_REFRESH_TIMEOUT
+            timed_out = False
+            for index, refresh in enumerate(refreshers):
+                # Reserve time for later features without concurrent login requests.
+                budget = max(0.0, deadline - loop.time()) / (len(refreshers) - index)
+                try:
+                    async with asyncio.timeout(budget):
+                        await refresh()
+                except TimeoutError:
+                    timed_out = True
+            if timed_out:
                 if not self._optional_refresh_timed_out:
                     _LOGGER.debug(
                         "Optional polling exceeded its time budget; publishing core storage data"
