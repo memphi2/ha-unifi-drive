@@ -45,6 +45,7 @@ from .snapshot_repairs import (
     async_update_snapshot_read_issue,
 )
 from .security import safe_error_text
+from .storage_view import StorageView
 from .snapshot_types import snapshot_target_key, snapshot_target_type
 
 if TYPE_CHECKING:
@@ -99,6 +100,7 @@ class UnifiUnasCoordinator(DataUpdateCoordinator[dict[str, Any]]):  # type: igno
         self._first_refresh_core_only = False
         self._optional_refresh_lock = asyncio.Lock()
         self._optional_refresh_timed_out = False
+        self._storage_view: StorageView | None = None
         interval = entry_int(entry, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
         interval = max(MIN_SCAN_INTERVAL, min(MAX_SCAN_INTERVAL, interval))
 
@@ -108,6 +110,11 @@ class UnifiUnasCoordinator(DataUpdateCoordinator[dict[str, Any]]):  # type: igno
             name=DOMAIN,
             update_interval=timedelta(seconds=interval),
         )
+
+    def async_update_listeners(self) -> None:
+        """Invalidate derived data even when a caller updates a payload in place."""
+        self._storage_view = None
+        super().async_update_listeners()
 
     async def async_config_entry_first_refresh(self) -> None:
         """Fetch core data first so entities can be registered quickly."""

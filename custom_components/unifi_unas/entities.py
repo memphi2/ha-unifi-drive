@@ -15,6 +15,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .coordinator import UnifiUnasCoordinator
 from .entity_base import UnifiUnasDeviceInfoMixin
 from .runtime import UnifiDriveConfigEntry, coordinator_from_entry
+from .storage_view import storage_view
 from .sensor_descriptions import (
     AGGREGATE_SENSOR_TYPES,
     DRIVE_SENSOR_TYPES,
@@ -37,8 +38,6 @@ from .storage_helpers import (
     _drive_name,
     _legacy_drive_index,
     _normalized_token,
-    _pool_drives,
-    _pool_from_key,
     _pool_key,
     _pool_name,
     _pools,
@@ -68,7 +67,8 @@ async def async_setup_entry(
     def _add_missing_pool_sensors() -> None:
         """Create pool sensors when pool data becomes available."""
         new_entities: list[SensorEntity] = []
-        for index, pool in enumerate(_pools(coordinator.data)):
+        view = storage_view(coordinator)
+        for index, pool in enumerate(view.pools):
             pool_key = _pool_key(pool, index)
             pool_name = _pool_name(pool, index)
 
@@ -81,7 +81,7 @@ async def async_setup_entry(
                     for description in POOL_SENSOR_TYPES
                 )
 
-            for drive_index, drive in enumerate(_pool_drives(pool)):
+            for drive_index, drive in enumerate(view.drives(pool)):
                 drive_key = _drive_key(drive, drive_index)
                 full_drive_key = f"{pool_key}_{drive_key}"
                 if full_drive_key in known_drive_keys:
@@ -232,8 +232,7 @@ class UnifiUnasPoolSensor(UnifiUnasBaseSensor):
 
     def _pool(self) -> dict[str, Any] | None:
         """Return the currently matching pool by key."""
-        pool, _ = _pool_from_key(self.coordinator.data, self._pool_key)
-        return pool
+        return storage_view(self.coordinator).pool(self._pool_key)
 
 
 class UnifiUnasDriveSensor(UnifiUnasBaseSensor):
@@ -293,11 +292,12 @@ class UnifiUnasDriveSensor(UnifiUnasBaseSensor):
 
     def _drive(self) -> dict[str, Any] | None:
         """Return currently matching drive by key."""
-        pool, _ = _pool_from_key(self.coordinator.data, self._pool_key)
+        view = storage_view(self.coordinator)
+        pool = view.pool(self._pool_key)
         if pool is None:
             return None
 
-        drives = _pool_drives(pool)
+        drives = view.drives(pool)
         for drive_index, drive in enumerate(drives):
             if f"{self._pool_key}_{_drive_key(drive, drive_index)}" == self._drive_key:
                 return drive
