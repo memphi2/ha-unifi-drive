@@ -341,6 +341,9 @@ def _missing_text_markers(text: str, markers: tuple[str, ...]) -> list[str]:
 
 def check_legal_docs() -> None:
     """Validate legal/disclaimer text and asset-hygiene documentation."""
+    component_license = INTEGRATION_DIR / "LICENSE"
+    if not component_license.is_file() or component_license.read_bytes() != LICENSE_PATH.read_bytes():
+        fail("The integration must include an unchanged copy of the root LICENSE")
     readme = README_PATH.read_text(encoding="utf-8")
     legal = LEGAL_PATH.read_text(encoding="utf-8")
 

@@ -214,6 +214,9 @@ This is an unofficial community integration. It does not claim affiliation,
 sponsorship or endorsement by Ubiquiti Inc., Home Assistant or HACS. Product names
 are used only as descriptive compatibility references.
 
+Ubiquiti and UniFi product names and marks belong to Ubiquiti Inc.; other marks
+belong to their respective owners.
+
 The repository does not include official Ubiquiti logos or proprietary Ubiquiti
 source code. See [docs/legal.md](docs/legal.md) for the legal and asset policy.
 

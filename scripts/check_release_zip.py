@@ -30,6 +30,7 @@ EXPECTED_ROOT = "unifi_unas/"
 REQUIRED_MEMBERS = (
     "unifi_unas/__init__.py",
     "unifi_unas/manifest.json",
+    "unifi_unas/LICENSE",
 )
 
 
@@ -98,6 +99,10 @@ def _release_zip_issues(zip_path: Path) -> list[str]:
                     continue
 
                 data = archive.read(info)
+                if member == "unifi_unas/LICENSE" and data != (
+                    SCRIPTS_DIR.parent / "LICENSE"
+                ).read_bytes():
+                    issues.append("release LICENSE differs from the repository license")
                 if b"\0" in data[:4096]:
                     continue
 

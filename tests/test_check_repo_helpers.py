@@ -81,6 +81,18 @@ def test_changelog_release_entry_matches_version_heading() -> None:
     assert module._has_changelog_release_entry(changelog, "v0.3.5") is False
 
 
+def test_legal_check_requires_matching_component_license(tmp_path, monkeypatch) -> None:
+    module = _load_check_repo_module()
+    monkeypatch.setattr(module, "INTEGRATION_DIR", tmp_path)
+    with pytest.raises(SystemExit):
+        module.check_legal_docs()
+    (tmp_path / "LICENSE").write_text("not the project license", encoding="utf-8")
+    with pytest.raises(SystemExit):
+        module.check_legal_docs()
+    (tmp_path / "LICENSE").write_bytes(module.LICENSE_PATH.read_bytes())
+    module.check_legal_docs()
+
+
 def test_quality_scale_accepts_honest_documented_gaps(
     tmp_path,
     monkeypatch,
