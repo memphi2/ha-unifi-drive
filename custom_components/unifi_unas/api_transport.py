@@ -15,6 +15,15 @@ from .security import safe_error_text
 _T = TypeVar("_T")
 
 
+def reject_redirect(response: ClientResponse) -> None:
+    """Do not follow console redirects or treat them as successful writes."""
+    if 300 <= response.status < 400:
+        raise CannotConnect(
+            "The console redirected the request. Check the configured host, port "
+            "and SSL settings; automatic redirects are not permitted."
+        )
+
+
 class ApiTransportMixin:
     """Shared request/response helpers."""
 
@@ -113,8 +122,10 @@ class ApiTransportMixin:
                 self._url(path),
                 headers=self._headers(),
                 ssl=self._ssl,
+                allow_redirects=False,
             )
             async with response:
+                reject_redirect(response)
                 self._update_csrf_token(response)
 
                 if response.status in (401, 403):
@@ -158,8 +169,10 @@ class ApiTransportMixin:
                 headers=self._headers(),
                 json=json_body,
                 ssl=self._ssl,
+                allow_redirects=False,
             )
             async with response:
+                reject_redirect(response)
                 self._update_csrf_token(response)
                 status = response.status
 
