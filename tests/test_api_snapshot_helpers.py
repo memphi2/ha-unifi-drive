@@ -1165,7 +1165,7 @@ def test_snapshot_create_error_redacts_target_path_and_payload() -> None:
         )
     ]
 
-    with pytest.raises(api_snapshot_module.UnsupportedFeature) as err:
+    with pytest.raises(api_snapshot_module.CannotConnect) as err:
         asyncio.run(client.async_create_snapshot_target(target))
 
     message = str(err.value)
@@ -1192,7 +1192,7 @@ def test_snapshot_inventory_and_write_errors_are_sanitized() -> None:
     client.responses = [
         (500, {"token": "secret-token", "message": "Authorization: Bearer raw-token"})
     ]
-    with pytest.raises(api_snapshot_module.UnsupportedFeature) as err:
+    with pytest.raises(api_snapshot_module.CannotConnect) as err:
         asyncio.run(
             client._async_update_snapshot_target_settings_once(
                 {"id": "user-1", "type": "mydrive", "user_id": "user-1"},
@@ -1201,6 +1201,26 @@ def test_snapshot_inventory_and_write_errors_are_sanitized() -> None:
         )
     assert "secret-token" not in str(err.value)
     assert "raw-token" not in str(err.value)
+
+
+@pytest.mark.parametrize("status", [400, 409, 429, 500, 503])
+@pytest.mark.parametrize("method", ["POST", "PUT", "DELETE"])
+def test_snapshot_write_never_retries_ambiguous_failure(status, method) -> None:
+    """Only an explicitly absent endpoint permits a second write attempt."""
+    client = SnapshotWriteClient()
+    client.responses = [(status, {}), (200, {})]
+    target = {"id": "shared-id", "type": "shared", "shared_drive_name": "Example"}
+    with pytest.raises(api_snapshot_module.CannotConnect, match=f"HTTP {status}"):
+        if method == "POST":
+            asyncio.run(client.async_create_snapshot_target(target))
+        else:
+            asyncio.run(client._async_update_snapshot_target_settings_once(
+                target, enabled=method != "DELETE",
+            ))
+    assert len(client.calls) == 1
+    assert client.calls[0][0] == method
+    assert client.snapshot_create_supported_by_type == {}
+    assert client.snapshot_settings_write_supported_by_type == {}
 
 
 def test_snapshot_write_uses_update_object_and_respects_cached_unsupported_type() -> None:

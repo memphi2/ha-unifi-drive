@@ -456,7 +456,7 @@ class ApiSnapshotMixin:
             raise UnsupportedFeature(
                 "Manual snapshot endpoint is not available on this system."
             )
-        raise UnsupportedFeature(
+        raise CannotConnect(
             f"Manual snapshot endpoint returned HTTP {status}: "
             f"{safe_response_summary(response_payload)}"
         )
@@ -504,12 +504,7 @@ class ApiSnapshotMixin:
         if delete_settings:
             write_attempts.insert(0, ("DELETE", None))
 
-        last_status: int | None = None
-        last_payload: Any = None
-        last_method = write_attempts[0][0]
         for method, body in write_attempts:
-            last_method = method
-            unsupported = True
             for path in _snapshot_settings_write_paths(target):
                 write_status, write_response = await self._request_raw(
                     method,
@@ -525,29 +520,23 @@ class ApiSnapshotMixin:
                     )
                     return
 
-                last_status = write_status
-                last_payload = write_response
                 if write_status not in SNAPSHOT_ENDPOINT_UNAVAILABLE_HTTP_STATUSES:
-                    unsupported = False
-
-            if unsupported:
-                if method == "PUT":
-                    self._set_snapshot_capability(
-                        "_snapshot_settings_write_supported",
-                        "_snapshot_settings_write_supported_by_type",
-                        target_type,
-                        False,
+                    # The write may have succeeded before the error response.
+                    raise CannotConnect(
+                        f"Snapshot settings {method.lower()} endpoint returned HTTP "
+                        f"{write_status}: {safe_response_summary(write_response)}"
                     )
-                    raise UnsupportedFeature(
-                        "Snapshot settings write endpoint is not available on this system."
-                    )
-                continue
-            break
 
-        raise UnsupportedFeature(
-            f"Snapshot settings {last_method.lower()} endpoint returned HTTP "
-            f"{last_status}: {safe_response_summary(last_payload)}"
-        )
+            if method == "PUT":
+                self._set_snapshot_capability(
+                    "_snapshot_settings_write_supported",
+                    "_snapshot_settings_write_supported_by_type",
+                    target_type,
+                    False,
+                )
+                raise UnsupportedFeature(
+                    "Snapshot settings write endpoint is not available on this system."
+                )
 
     def _current_user_id(self) -> str | None:
         """Return the authenticated user id when login metadata exposes it."""
