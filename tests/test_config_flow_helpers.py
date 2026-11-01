@@ -2431,7 +2431,7 @@ def test_validate_input_uses_system_mac_when_device_id_missing() -> None:
             }
 
     validation_globals["UnifiUnasApiClient"] = _Client
-    validation_globals["async_create_clientsession"] = lambda *args, **kwargs: object()
+    validation_globals["async_create_clientsession"] = lambda *args, **kwargs: types.SimpleNamespace(detach=lambda: None)
     try:
         info = asyncio.run(
             config_flow_module.async_validate_input(

@@ -71,18 +71,22 @@ async def async_validate_input(
         hass,
         verify_ssl=bool(data[CONF_VERIFY_SSL]),
         cookie_jar=aiohttp.CookieJar(unsafe=True),
+        auto_cleanup=False,
     )
-    client = UnifiUnasApiClient(
-        session,
-        host=data[CONF_HOST],
-        username=data.get(CONF_USERNAME, ""),
-        password=data.get(CONF_PASSWORD, ""),
-        api_key=data.get(CONF_API_KEY) or None,
-        port=int(data[CONF_PORT]),
-        use_ssl=bool(data[CONF_SSL]),
-        verify_ssl=bool(data[CONF_VERIFY_SSL]),
-    )
-    storage = await client.async_check_connection()
+    try:
+        client = UnifiUnasApiClient(
+            session,
+            host=data[CONF_HOST],
+            username=data.get(CONF_USERNAME, ""),
+            password=data.get(CONF_PASSWORD, ""),
+            api_key=data.get(CONF_API_KEY) or None,
+            port=int(data[CONF_PORT]),
+            use_ssl=bool(data[CONF_SSL]),
+            verify_ssl=bool(data[CONF_VERIFY_SSL]),
+        )
+        storage = await client.async_check_connection()
+    finally:
+        session.detach()
     pools = storage.get("pools")
     if pools is not None and not isinstance(pools, list):
         raise UnexpectedResponse("Storage response contains a non-list pools value")

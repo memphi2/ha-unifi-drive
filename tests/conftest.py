@@ -10,6 +10,7 @@ import pytest
 
 HA_BACKED_TEST_FILES = {
     "test_api_http_safety.py",
+    "test_config_flow_sessions.py",
     "test_control_entity_states.py",
     "test_core_monitoring_entity_states.py",
     "test_integration_entry_setup.py",
