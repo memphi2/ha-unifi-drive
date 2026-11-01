@@ -370,7 +370,7 @@ def test_workflow_python_versions_require_compatibility_matrix(
         "    include:\n"
         "      - homeassistant: \"2024.8.0\"\n"
         "        python: \"3.12\"\n"
-        "      - homeassistant: \"2026.10.0\"\n"
+        "      - homeassistant: \"2026.10.4\"\n"
         "        python: \"3.14\"\n"
         "steps:\n"
         "  - uses: actions/setup-python@v6\n"
@@ -414,9 +414,9 @@ def test_validate_workflow_requires_homeassistant_compatibility_targets(
         "      - homeassistant: \"2024.8.0\"\n"
         "        python: \"3.12\"\n"
         "        pytest_homeassistant: \"0.13.152\"\n"
-        "      - homeassistant: \"2026.10.0\"\n"
+        "      - homeassistant: \"2026.10.4\"\n"
         "        python: \"3.14\"\n"
-        "        pytest_homeassistant: \"0.13.371\"\n"
+        "        pytest_homeassistant: \"0.13.375\"\n"
         "steps:\n"
         "  - uses: actions/setup-python@v6\n"
         "    with:\n"
@@ -444,7 +444,7 @@ def test_validate_workflow_requires_homeassistant_compatibility_targets(
 
     workflow_path.write_text(
         workflow_path.read_text(encoding="utf-8").replace(
-            '        pytest_homeassistant: "0.13.371"\n',
+            '        pytest_homeassistant: "0.13.375"\n',
             "",
         ),
         encoding="utf-8",
@@ -459,9 +459,9 @@ def test_validate_workflow_requires_homeassistant_compatibility_targets(
         "      - homeassistant: \"2024.8.0\"\n"
         "        python: \"3.12\"\n"
         "        pytest_homeassistant: \"0.13.152\"\n"
-        "      - homeassistant: \"2026.10.0\"\n"
+        "      - homeassistant: \"2026.10.4\"\n"
         "        python: \"3.14\"\n"
-        "        pytest_homeassistant: \"0.13.371\"\n"
+        "        pytest_homeassistant: \"0.13.375\"\n"
         "steps:\n"
         "  - uses: actions/setup-python@v6\n"
         "    with:\n"
@@ -493,9 +493,9 @@ def test_validate_workflow_must_cover_hacs_minimum(
         "      - homeassistant: \"2024.8.0\"\n"
         "        python: \"3.12\"\n"
         "        pytest_homeassistant: \"0.13.152\"\n"
-        "      - homeassistant: \"2026.10.0\"\n"
+        "      - homeassistant: \"2026.10.4\"\n"
         "        python: \"3.14\"\n"
-        "        pytest_homeassistant: \"0.13.371\"\n"
+        "        pytest_homeassistant: \"0.13.375\"\n"
         "steps:\n"
         "  - run: |\n"
         "      pip install "

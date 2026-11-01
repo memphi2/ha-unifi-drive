@@ -24,7 +24,7 @@ The release owner must complete the gates below on the final PR commit.
   version, ignore dependencies or reuse October fixtures as November evidence.
 - [ ] Update the current HA/helper pair in `.github/workflows/validate.yml`,
   `CURRENT_HOMEASSISTANT_TARGET` / `CURRENT_PYTEST_HOMEASSISTANT` in
-  `scripts/check_repo.py`, their tests and the README/LTS compatibility table.
+  `scripts/check_repo.py`, their tests and the compatibility summary in `docs/lts.md`.
   Keep the HA `2024.8.0` / Python `3.12` leg and Python `3.14` for November.
 - [ ] Dependency checks, HACS, Hassfest, Ruff, Mypy, Bandit, full pytest, at least
   95% coverage, compileall and whitespace checks pass for the final PR commit.
@@ -48,7 +48,7 @@ The release owner must complete the gates below on the final PR commit.
 | Gate | Evidence |
 | --- | --- |
 | HA 2024.8.0 / Python 3.12.13 / helper 0.13.152 | 571 tests passed, no skips; coverage 95.18%; `pip check`, Ruff, Mypy, Bandit and compileall passed with the pinned CI tools |
-| HA 2026.10.0 / Python 3.14.4 / helper 0.13.371 | 571 tests passed, no skips; coverage 95.72%; `pip check`, Ruff, Mypy, Bandit, repository checks and compileall passed with the pinned CI tools |
+| HA 2026.10.4 / Python 3.14.4 / helper 0.13.375 | 571 tests passed, no skips; coverage 95.72%; `pip check`, Ruff, Mypy, Bandit, repository checks and compileall passed with the pinned CI tools |
 | Public surfaces and archive | Existing public GitHub surfaces and locally built release ZIP passed the automated privacy/legal/layout audit |
 | Stable HA 2026.11 / matching test helper | Pending upstream release and full test run |
 | November `DeviceInfo` | Focused check against actual HA `2026.11.0b1` passed; not a full compatibility result |

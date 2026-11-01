@@ -176,8 +176,8 @@ VALIDATE_WORKFLOW_HA_REQUIREMENT_PATTERN = re.compile(
 VALIDATE_WORKFLOW_PYTHON_PATTERN = re.compile(r"python:\s*[\"']?3\.14[\"']?")
 VALIDATE_WORKFLOW_MINIMUM_PYTHON_PATTERN = re.compile(r"python:\s*[\"']?3\.12[\"']?")
 RELEASE_WORKFLOW_PYTHON_PATTERN = re.compile(r"python-version:\s*[\"']?3\.14[\"']?")
-CURRENT_HOMEASSISTANT_TARGET = "2026.10.0"
-CURRENT_PYTEST_HOMEASSISTANT = "0.13.371"
+CURRENT_HOMEASSISTANT_TARGET = "2026.10.4"
+CURRENT_PYTEST_HOMEASSISTANT = "0.13.375"
 WORKFLOW_HOMEASSISTANT_MATRIX_PATTERN = re.compile(
     r"homeassistant:\s*[\"']([^\"']+)[\"']"
 )
@@ -216,7 +216,7 @@ LEGAL_DOC_MARKERS = (
     "observed interoperability behavior only",
 )
 README_BRONZE_DOC_MARKERS = (
-    "## Current Maturity",
+    "## Maturity And Roadmap",
     "## Installation",
     "## Removal",
     "## Services",
@@ -227,12 +227,12 @@ README_BRONZE_DOC_MARKERS = (
 README_HIGHER_QUALITY_DOC_MARKERS = (
     "## Supported Devices",
     "## Data Updates",
-    "## Use Cases And Automation Examples",
-    "## Silver Gold Platinum Roadmap",
+    "## Automation Examples",
+    "(custom_components/unifi_unas/quality_scale.yaml)",
 )
 MARKETPLACE_README_MARKERS = (
     "### Home Assistant Marketplace",
-    "### HACS On Older Home Assistant Versions",
+    "### HACS",
     "## Updates",
     "(docs/installation.md)",
 )

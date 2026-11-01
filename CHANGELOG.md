@@ -2,6 +2,10 @@
 
 ## v0.8.9 - HA 2026.11 and Marketplace preparation
 
+- Updates the stable CI target to HA `2026.10.4` with matching test helper
+  `0.13.375`; keeps the HACS-advertised `2024.8.0` minimum covered.
+- Streamlines the README around features, options, setup and everyday use;
+  moves release/CI detail to the maintenance docs and keeps the Marketplace button.
 - Reads modern Home Assistant `DeviceInfo` through attributes while retaining
   the older dictionary representation. Unset metadata preserves existing device
   firmware/URLs, and unchanged metadata does not write the device registry.

@@ -61,8 +61,10 @@ References: [Dependabot schedule and PR limits](https://docs.github.com/en/code-
 ## November 2026 Compatibility Review
 
 Reviewed on `2026-11-01`. Home Assistant `2026.11` is still a beta at this review
-date. The configured CI targets remain `2024.8.0` / Python `3.12` and `2026.10.0` /
-Python `3.14`. Marketplace documentation and catalog metadata alone do not prove
+date. CI covers `2024.8.0` / Python `3.12` / test helper `0.13.152` and the current
+stable `2026.10.4` / Python `3.14` / test helper `0.13.375`. The latter helper
+declares an exact dependency on HA `2026.10.4`; it is not suitable as a November
+test baseline. Marketplace documentation and catalog metadata alone do not prove
 runtime compatibility with the November release.
 
 The `v0.8.9` [release checklist](release_0.8.9.md) tracks the remaining gates.

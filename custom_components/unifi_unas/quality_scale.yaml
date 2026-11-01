@@ -102,7 +102,7 @@ rules:
     comment: README documents polling, cached offline data and optional endpoint handling.
   docs-examples:
     status: done
-    comment: README includes safe automation examples.
+    comment: README links to safe automation examples in docs/examples.md.
   docs-known-limitations:
     status: done
     comment: README documents known limitations separately from bugs.
@@ -111,7 +111,7 @@ rules:
     comment: README documents current tested and expected compatible device scope.
   docs-supported-functions:
     status: done
-    comment: README capability matrix documents supported functions and platforms.
+    comment: README summarizes supported functions and links to the platform details in docs/entities.md.
   docs-troubleshooting:
     status: done
     comment: README contains user troubleshooting guidance.
