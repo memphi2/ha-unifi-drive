@@ -13,6 +13,22 @@ def _load_check_repo_module():
     return load_repo_module("check_repo_for_tests", ROOT / "scripts" / "check_repo.py")
 
 
+@pytest.mark.parametrize("name", ["Snapshot-Limit", "{wrong} Snapshot-Limit", "{target_name", None])
+def test_entity_translation_rejects_missing_or_invalid_placeholders(name):
+    module = _load_check_repo_module()
+    source = {"entity": {"number": {"snapshot_limit": {"name": "{target_name} Snapshot limit"}}}}
+    translated = {"entity": {"number": {"snapshot_limit": {"name": name}}}}
+    with pytest.raises(SystemExit):
+        module._check_entity_name_placeholders(source, translated, "example.json")
+
+
+def test_entity_translation_accepts_reordered_placeholders():
+    module = _load_check_repo_module()
+    source = {"entity": {"sensor": {"drive": {"name": "{pool_name} {drive_name} Temperature"}}}}
+    translated = {"entity": {"sensor": {"drive": {"name": "Temperatur {drive_name} ({pool_name})"}}}}
+    module._check_entity_name_placeholders(source, translated, "example.json")
+
+
 def test_manifest_version_tag_adds_release_prefix() -> None:
     """Manifest versions should map to GitHub release tag names."""
     module = _load_check_repo_module()

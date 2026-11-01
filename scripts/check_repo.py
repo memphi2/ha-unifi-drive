@@ -11,6 +11,7 @@ import subprocess  # nosec B404
 import shutil
 import sys
 from pathlib import Path
+from string import Formatter
 from typing import Any
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -544,7 +545,30 @@ def check_translations() -> None:
                 f"Translation keys mismatch in {file.name}; "
                 f"missing={missing}, extra={extra}"
             )
+        _check_entity_name_placeholders(strings, translation, file.name)
         ok(f"Translation JSON valid: {file.name}")
+
+
+def _check_entity_name_placeholders(
+    source: dict[str, Any], translation: dict[str, Any], label: str,
+) -> None:
+    """Keep dynamic names translatable without dropping identity placeholders."""
+    formatter = Formatter()
+    for platform, definitions in source.get("entity", {}).items():
+        for key, definition in definitions.items():
+            if "name" not in definition:
+                continue
+            original = definition["name"]
+            translated = translation["entity"][platform][key]["name"]
+            if not isinstance(original, str) or not isinstance(translated, str):
+                fail(f"{label} entity.{platform}.{key}.name must be text")
+            try:
+                expected = {field for _, field, _, _ in formatter.parse(original) if field is not None}
+                actual = {field for _, field, _, _ in formatter.parse(translated) if field is not None}
+            except ValueError:
+                fail(f"{label} entity.{platform}.{key}.name has invalid placeholders")
+            if expected != actual:
+                fail(f"{label} entity.{platform}.{key}.name placeholders differ")
 
 
 def _check_config_step_data_descriptions(
