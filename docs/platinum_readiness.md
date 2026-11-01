@@ -1,82 +1,51 @@
-# Platinum Readiness Audit
+# Quality Readiness And Roadmap
 
-This audit records the current higher-tier Home Assistant Quality Scale status
-for the unofficial UniFi Drive / UNAS custom integration. It is intentionally
-conservative: a rule is marked as remaining work when implementation, tests,
-documentation, and repository checks do not all support a `done` claim.
+This is the canonical quality assessment for the current development branch.
+[quality_scale.yaml](../custom_components/unifi_unas/quality_scale.yaml) tracks
+individual rules. Neither this document nor a green CI run claims an official
+Home Assistant tier.
 
-## What Improved
+## Current Maturity
 
-- Added explicit `PARALLEL_UPDATES` declarations for every platform.
-- Expanded `quality_scale.yaml` from Bronze-only tracking to the full
-  Bronze/Silver/Gold/Platinum rule list with conservative statuses.
-- Added a typed `UnifiDriveConfigEntry` runtime-data alias and `py.typed` marker
-  as the foundation for strict typing.
-- Added a strict `mypy` CI gate for config-entry setup/unload, coordinator,
-  runtime, API client and mixins, config-flow helper, entry-reload, device-info,
-  diagnostics, discovery, shared entity base, repair, service, snapshot,
-  storage, security, URL, WOL, exception, and API-error modules that already
-  have practical Home Assistant-compatible type boundaries, with sensor and binary
-  entity-description metadata classes moved under strict typing scope.
-- Converted service and entity action failures to Home Assistant translatable
-  exception keys while preserving fallback messages.
-- Strengthened repository checks so they validate higher-tier rule tracking,
-  README quality sections, platform parallel-update declarations, typed
-  runtime-entry usage, strict mypy gate structure, translated exceptions, icon
-  translations, and the coverage gate.
-- Added Bandit and coverage enforcement to CI repository validation.
-- Documented data-update behavior, supported device scope, safe automation
-  examples, and the Silver/Gold/Platinum roadmap in the README.
+| Area | Status and evidence |
+| --- | --- |
+| Core monitoring | Mature beta; HA-state tests cover degraded pools, cached offline readings and recovery. |
+| Discovery | Hardened beta; identity conflict, dedupe, aliases and metadata-only updates have regression coverage. VLAN behavior still needs representative live networks. |
+| Snapshot inventory | Beta; bounded previews, throttled reads and separate failed-read/missing-target handling. |
+| Local controls | Experimental; firmware and account permissions determine support. Writes require explicit user actions. |
+| Lifecycle and privacy | Runtime ownership, unload cleanup, temporary-session cleanup, redirect boundaries and diagnostics redaction are tested. |
+| Performance | Entity normalization is cached only for the current refresh. Optional polling has a ten-second budget. Large preview attributes are not recorded. |
 
-## Current Higher-Tier Status
+## Open Quality Rules
 
-| Area | Status | Notes |
-| --- | --- | --- |
-| Config-entry lifecycle | Strong | Runtime data, unload cleanup, update listener cleanup, metadata-only reload skip, and delayed discovery cleanup are implemented. |
-| Coordinator/offline behavior | Strong | Transient cached data and single outage/recovery logging are implemented; optional endpoints are isolated from core monitoring. |
-| Entity model | Strong | Unique IDs, device info, entity categories, disabled-by-default noisy telemetry, availability, and coordinator usage are covered. |
-| Diagnostics/privacy | Strong | Diagnostics are versioned, grouped, and redacted for local identifiers and snapshot target details. |
-| Discovery | Strong beta | UniFi discovery and zeroconf use trusted identity hints and avoid pre-confirmation credential use against uncertain hosts. |
-| Repairs | Good | Snapshot-target issues are actionable, privacy-safe, and clear when the condition resolves; powered-off/offline devices do not create snapshot-read repairs. |
-| Typing | Strong partial | Runtime data uses a typed config-entry alias, `py.typed` is present, and CI enforces strict mypy on setup/unload, coordinator, runtime, the API client/mixins, config-flow helper, diagnostics, discovery, shared entity base, repairs, services, snapshot, storage and support modules; full integration-wide mypy remains open. |
-| Test coverage | Strong | Latest local line coverage for `custom_components/unifi_unas` is above 95% and CI enforces the coverage gate. |
-| Documentation | Strong | README now covers installation, removal, options, data updates, capabilities, diagnostics, limitations, use cases, and roadmap. |
-| CI | Strong | CI runs HACS, Hassfest, repository checks, Ruff, Bandit, coverage-backed pytest, compileall, and whitespace checks. |
+| Rule | Remaining work |
+| --- | --- |
+| config-flow-test-coverage | Complete HA-driven tests of every setup, options, reauth and reconfigure branch. Helper coverage alone is insufficient. |
+| entity-unavailable | Monitoring intentionally retains last-known readings while Device online reports offline. This does not fully satisfy HA's sensor availability rule. Keep WOL usable and resolve this as an explicit compatibility decision. |
+| test-coverage | CI enforces 95% aggregate line coverage. HA requires more than 95% per module; close the gaps with behavior tests, not exclusions. |
+| strict-typing | Extend strict mypy from runtime/API/helpers to the remaining flow and entity platform modules without weakening checks. |
 
-## Silver And Gold Baseline
+Rule references: [flow coverage](https://contributors.home-assistant.io/core/quality-scale/config-flow-test-coverage/),
+[availability](https://contributors.home-assistant.io/core/quality-scale/entity-unavailable/),
+[test coverage](https://contributors.home-assistant.io/core/quality-scale/test-coverage/).
 
-The tracked rules include implemented behavior and documented gaps; complete
-Bronze, Silver, and Gold compliance is not claimed. In particular, flow coverage,
-per-module coverage and cached sensor availability remain open. Keep adding
-HA-backed and live-device coverage for reload,
-offline startup, recovery, update, backup, fan, and snapshot permission profiles
-so future firmware differences do not erode that baseline.
+## Recommended Work Order
 
-## Remaining Gaps Before Platinum
+1. Complete the HA-backed flow and per-module coverage gaps.
+2. Extend strict typing in small platform-specific batches.
+3. Agree on sensor availability semantics before changing cached offline behavior.
+4. Repeat long-running RAM/CPU/Recorder measurements with a recorded commit,
+   HA/Python versions, firmware, enabled entities, poll interval and workload.
+5. Validate optional controls across firmware and permission profiles. Do not
+   promote them based on one device or one successful endpoint response.
 
-- Extend the strict mypy gate from the typed lifecycle/API/helper layer to the full
-  Home Assistant entity platform layer, config-flow service surfaces, and the
-  remaining platform runtime paths without weakening strict checks.
-- Keep dependency/session behavior documented when external dependencies change.
-- Avoid marking strict typing complete until the gate is part of the normal
-  validation path.
+## Validation And Release
 
-## Intentional Experimental Areas
+[Validation](validation.md) defines the full local and CI gates, plus independent
+final-head Code Review and Security Review. The [release checklist](release_0.8.9.md)
+tracks November compatibility and Marketplace lifecycle checks. No live HA/NAS
+validation is implied by local synthetic tests.
 
-- Snapshot settings, inventory, and create controls remain opt-in and
-  firmware-dependent.
-- Backup-task buttons remain endpoint-dependent.
-- Fan mode, restart, shutdown, and update install remain console-level local
-  controls requiring appropriate permissions.
-- Discovery remains conservative when VLANs, multiple interfaces, stale DNS, or
-  incomplete mDNS metadata prevent trusted identity matching.
-
-## Risk Assessment
-
-- Core read-only monitoring risk is low.
-- Optional control risk is moderate because local UniFi Drive / UniFi OS
-  endpoints and permissions vary by firmware.
-- Discovery risk is moderate in heterogeneous networks, but current identity
-  handling favors manual confirmation over unsafe duplicate suppression.
-- Privacy risk is low as long as future diagnostics additions keep raw payload
-  values and local identifiers out of exports.
+Historical evidence remains in the [v0.6.2 live report](live_test_report_v0.6.2.md)
+and [DB probe](live_db_probe.md). Those reports do not establish current release
+compatibility or present-day database growth.

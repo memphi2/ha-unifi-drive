@@ -24,8 +24,10 @@ normal operation does not use UniFi cloud services.
 | Snapshot inventory | Optional snapshot counts and target information where supported. |
 | Local controls | Optional snapshot creation/settings, fan controls, backup tasks, updates, restart and shutdown. |
 
-**Local controls are experimental**, opt-in, and dependent on firmware and account
-permissions. Snapshot delete and restore actions are not provided.
+**Local controls are experimental** and dependent on firmware and account
+permissions. Fan and snapshot entities are enabled through options; all control
+actions require an explicit user or automation request. Snapshot delete and
+restore actions are not provided. Lowering retention may let the NAS expire older snapshots.
 
 See the [entity overview](docs/entities.md) for the available sensors and controls.
 
@@ -34,11 +36,11 @@ See the [entity overview](docs/entities.md) for the available sensors and contro
 Open `Settings` -> `Devices & services` -> **UniFi Drive / UNAS** -> `Configure`.
 
 - Enable Wake-on-LAN and provide the device's MAC address.
-- Enable snapshot inventory to monitor supported targets.
-- Enable only the snapshot, fan, backup or update controls you need.
+- Choose the polling interval and enable fan or snapshot entities as needed.
 - Enable discovery diagnostics temporarily when investigating detection problems.
 
-Leave optional controls disabled for a monitoring-only setup.
+For a monitoring-only dashboard, disable unwanted control entities. Backup-task,
+restart/shutdown and update entities are not separate feature switches in options.
 
 ## Supported Devices
 
@@ -130,7 +132,7 @@ Available actions include `unifi_unas.wake_on_lan`, `reboot`, `shutdown`,
 
 For multiple configured devices, pass `entry_id` to select the intended NAS.
 Except for Wake-on-LAN, control actions require an online device and the relevant
-options and permissions.
+device-side permissions.
 
 ## Automation Examples
 
@@ -144,6 +146,11 @@ Download diagnostics from the integration entry when reporting an issue.
 The export includes runtime, discovery and capability information; credentials,
 local addresses, device identifiers and snapshot/share names are redacted or
 reduced to presence flags.
+
+Snapshot preview lists, IDs, names and descriptions remain visible in current
+entity attributes but are excluded from Recorder history. Counts and timestamps
+remain recordable. Large previews therefore do not duplicate their full contents
+in the database on each change.
 
 Review attachments before posting. Do not share credentials or unredacted device
 API responses. Report reproducible problems through
@@ -189,7 +196,7 @@ Development is Platinum-oriented, but full Bronze/Silver/Gold compliance is not
 claimed. Flow coverage, per-module coverage, cached sensor availability and strict
 typing still have documented gaps in
 [quality_scale.yaml](custom_components/unifi_unas/quality_scale.yaml) and the
-[quality roadmap](docs/platinum_prep.md). This is not official Home Assistant
+[quality roadmap](docs/platinum_readiness.md). This is not official Home Assistant
 Core certification.
 
 ## Documentation

@@ -2,6 +2,14 @@
 
 ## v0.8.9 - HA 2026.11 and Marketplace preparation
 
+- Hardens HTTP redirect boundaries and error privacy, and releases temporary
+  config-flow sessions after success, failure or cancellation.
+- Serializes snapshot settings updates against fresh target data and prevents
+  failed target reads from creating false missing-target repairs.
+- Bounds optional polling latency, shares pool/drive normalization within each
+  refresh and excludes large snapshot previews from recorded attributes.
+- Consolidates quality documentation, records outstanding rules honestly and
+  shares repository/archive/public-surface hygiene checks without new dependencies.
 - Requires separate Code Review and dedicated Security Review evidence for the
   final PR head before release; documents the release-owner verification gate.
 - Updates the stable CI target to HA `2026.10.4` with matching test helper
