@@ -1117,11 +1117,11 @@ def main() -> None:
     ensure_file(GITHUB_SURFACE_AUDIT_PATH)
     ensure_file(CI_TOOL_REQUIREMENTS_PATH)
 
+    check_tracked_file_hygiene()
     check_all_text_files_for_mojibake()
     check_legal_docs()
     check_bronze_docs()
     check_marketplace_docs()
-    check_tracked_file_hygiene()
     check_manifest()
     check_entity_name_rule()
     check_hacs()

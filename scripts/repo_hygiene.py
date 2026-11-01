@@ -224,13 +224,13 @@ def _tracked_file_hygiene_issues(root: Path, tracked_paths: list[str]) -> list[s
     for relative in tracked_paths:
         normalized = relative.replace("\\", "/")
         if _path_matches_any(normalized, SECRET_PATH_PATTERNS):
-            failures.append(f"tracked secret-like path: {relative}")
+            failures.append("tracked secret-like path")
             continue
         if _path_matches_any(normalized, GENERATED_ARTIFACT_PATH_PATTERNS):
-            failures.append(f"tracked generated artifact path: {relative}")
+            failures.append("tracked generated artifact path")
             continue
         if _path_matches_any(normalized, OFFICIAL_VENDOR_ASSET_PATH_PATTERNS):
-            failures.append(f"tracked official/vendor asset path: {relative}")
+            failures.append("tracked official/vendor asset path")
             continue
         local_path_issues = local_identifier_issues(
             "tracked path",
@@ -244,7 +244,7 @@ def _tracked_file_hygiene_issues(root: Path, tracked_paths: list[str]) -> list[s
         try:
             data = path.read_bytes()
         except OSError as err:
-            failures.append(f"could not read tracked file {relative}: {err}")
+            failures.append(f"could not read tracked file: {type(err).__name__}")
             continue
 
         if b"\0" in data[:4096]:

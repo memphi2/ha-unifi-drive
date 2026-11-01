@@ -49,9 +49,9 @@ def _release_zip_issues(zip_path: Path) -> list[str]:
     """Return release ZIP privacy, legal and layout issues."""
     issues: list[str] = []
     if not zip_path.exists():
-        return [f"missing release ZIP: {zip_path}"]
+        return ["missing release ZIP"]
     if zip_path.is_dir():
-        return [f"release ZIP path is a directory: {zip_path}"]
+        return ["release ZIP path is a directory"]
 
     try:
         with ZipFile(zip_path) as archive:
@@ -71,24 +71,24 @@ def _release_zip_issues(zip_path: Path) -> list[str]:
                     continue
 
                 if _has_unsafe_member_path(member):
-                    issues.append(f"unsafe ZIP member path: {member}")
+                    issues.append("unsafe ZIP member path")
                     continue
 
                 if not member.startswith(EXPECTED_ROOT):
-                    issues.append(f"unexpected member outside {EXPECTED_ROOT}: {member}")
+                    issues.append(f"unexpected member outside {EXPECTED_ROOT}")
                     continue
 
                 if member.endswith("/"):
                     continue
 
                 if _path_matches_any(member, SECRET_PATH_PATTERNS):
-                    issues.append(f"secret-like path in release ZIP: {member}")
+                    issues.append("secret-like path in release ZIP")
                     continue
                 if _path_matches_any(member, GENERATED_ARTIFACT_PATH_PATTERNS):
-                    issues.append(f"generated artifact in release ZIP: {member}")
+                    issues.append("generated artifact in release ZIP")
                     continue
                 if _path_matches_any(member, OFFICIAL_VENDOR_ASSET_PATH_PATTERNS):
-                    issues.append(f"official/vendor asset path in release ZIP: {member}")
+                    issues.append("official/vendor asset path in release ZIP")
                     continue
                 local_path_issues = local_identifier_issues(
                     "release ZIP member path",
@@ -120,7 +120,7 @@ def _release_zip_issues(zip_path: Path) -> list[str]:
                         issues.append(f"{member}: possible {label}")
                         break
     except BadZipFile:
-        return [f"invalid ZIP file: {zip_path}"]
+        return ["invalid ZIP file"]
 
     return issues
 

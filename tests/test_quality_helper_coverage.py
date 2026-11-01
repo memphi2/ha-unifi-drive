@@ -235,9 +235,12 @@ def test_runtime_discovery_and_snapshot_value_helpers_cover_edge_shapes() -> Non
     assert snapshot_values._bool_value("unknown") is None
     assert snapshot_values._payload_debug_shape(["bad"]) == "list"
     assert snapshot_values._payload_debug_shape({"data": [1, 2]}) == {
-        "top_level_keys": ["data"],
+        "top_level_count": 1,
         "data_type": "list",
         "data_count": 2,
+    }
+    assert snapshot_values._payload_debug_shape({"data": {"Example Private Share": []}}) == {
+        "top_level_count": 1, "data_type": "dict", "data_count": 1,
     }
 
 

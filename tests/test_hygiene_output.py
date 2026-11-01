@@ -72,3 +72,27 @@ def test_audit_failure_reports_categories_without_values(
     assert error.value.code == 1
     assert f"possible {category}" in output.out
     assert matched not in output.out + output.err
+
+
+@pytest.mark.parametrize("surface", ["repository", "archive"])
+@pytest.mark.parametrize("suffix", [".storage/auth", "__pycache__/x.pyc", "unifi-logo.png", "../x.txt", "note.txt"])
+def test_rejected_paths_do_not_echo_private_markers(tmp_path, monkeypatch, capsys, surface, suffix):
+    """Filename rejection must be private even before content checks run."""
+    marker = "example-private-marker"
+    monkeypatch.setenv("UNIFI_UNAS_FORBIDDEN_MARKERS", marker)
+    member = f"unifi_unas/{marker}/{suffix}"
+    filename = "check_repo.py" if surface == "repository" else "check_release_zip.py"
+    module = load_repo_module(f"hygiene_paths_{surface}", ROOT / "scripts" / filename)
+    with pytest.raises(SystemExit):
+        if surface == "repository":
+            monkeypatch.setattr(module, "ROOT", tmp_path)
+            monkeypatch.setattr(module, "_tracked_file_paths", lambda: [member])
+            monkeypatch.setattr(module, "ensure_file", lambda path: None)
+            module.main()
+        else:
+            archive_path = tmp_path / "example.zip"
+            with ZipFile(archive_path, "w") as archive:
+                archive.writestr(member, "{}")
+            module.check_release_zip(archive_path)
+    output = capsys.readouterr()
+    assert marker not in output.out + output.err
