@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 import sys
 from types import SimpleNamespace
@@ -411,8 +412,9 @@ async def test_setup_and_unload_entry_stores_and_removes_coordinator(hass) -> No
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("error_type", [RuntimeError, asyncio.CancelledError])
 async def test_setup_entry_cleans_runtime_when_platform_forwarding_fails(
-    hass,
+    hass, error_type,
 ) -> None:
     """A failed platform setup should not leave stale runtime objects."""
     _ensure_repo_custom_components_path()
@@ -446,15 +448,17 @@ async def test_setup_entry_cleans_runtime_when_platform_forwarding_fails(
         ),
         patch(
             "homeassistant.config_entries.ConfigEntries.async_forward_entry_setups",
-            new=AsyncMock(side_effect=RuntimeError("forward setup failed")),
+            new=AsyncMock(side_effect=error_type("forward setup failed")),
         ),
     ):
-        with pytest.raises(RuntimeError, match="forward setup failed"):
-            await async_setup_entry(hass, entry)
-
-    assert entry.entry_id not in hass.data.get(DOMAIN, {})
-    assert getattr(entry, "runtime_data", None) is None
-    remove_snapshot_cleanup_listener.assert_called_once()
+        for _ in range(20):
+            with pytest.raises(error_type, match="forward setup failed"):
+                await async_setup_entry(hass, entry)
+            await entry._async_process_on_unload(hass)
+            assert entry.entry_id not in hass.data.get(DOMAIN, {})
+            assert getattr(entry, "runtime_data", None) is None
+            assert not entry.update_listeners
+    assert remove_snapshot_cleanup_listener.call_count == 20
 
 
 @pytest.mark.asyncio
