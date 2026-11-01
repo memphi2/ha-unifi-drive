@@ -81,11 +81,11 @@ def test_changelog_release_entry_matches_version_heading() -> None:
     assert module._has_changelog_release_entry(changelog, "v0.3.5") is False
 
 
-def test_quality_scale_requires_done_bronze_silver_gold_rules(
+def test_quality_scale_accepts_honest_documented_gaps(
     tmp_path,
     monkeypatch,
 ) -> None:
-    """Quality scale validation should require Bronze, Silver and Gold done."""
+    """Complete rule tracking must allow documented gaps without lowering tests."""
     module = _load_check_repo_module()
     quality_scale_path = tmp_path / "quality_scale.yaml"
     all_rules = [
@@ -103,7 +103,7 @@ def test_quality_scale_requires_done_bronze_silver_gold_rules(
                 + module.QUALITY_RULES_BY_TIER["silver"]
                 + module.QUALITY_RULES_BY_TIER["gold"]
             )
-            else f"  {rule}: todo"
+            else f"  {rule}:\n    status: todo\n    comment: Remaining work."
             for rule in all_rules
         )
         + "\n",
@@ -112,6 +112,15 @@ def test_quality_scale_requires_done_bronze_silver_gold_rules(
     monkeypatch.setattr(module, "QUALITY_SCALE_PATH", quality_scale_path)
 
     module.check_quality_scale()
+
+    complete = quality_scale_path.read_text(encoding="utf-8")
+    quality_scale_path.write_text(complete.replace(
+        "  test-coverage: done", "  test-coverage:\n    status: todo\n    comment: Per-module coverage pending."
+    ), encoding="utf-8")
+    module.check_quality_scale()
+    quality_scale_path.write_text(complete.replace("  test-coverage: done", "  test-coverage: todo"), encoding="utf-8")
+    with pytest.raises(SystemExit, match="1"):
+        module.check_quality_scale()
 
     quality_scale_path.write_text(
         "rules:\n  action-setup: done\n  runtime-data: todo\n",

@@ -1,9 +1,9 @@
 # Bronze Readiness Assessment
 
 This document summarizes the Home Assistant Bronze Quality Scale readiness work
-for the unofficial UniFi Drive / UNAS custom integration. The current branch has
-since been hardened further so the tracked Bronze, Silver, and Gold rules are
-implemented in `quality_scale.yaml`.
+for the unofficial UniFi Drive / UNAS custom integration. This is historical
+implementation evidence, not proof of complete tier compliance. Current gaps
+are tracked in `quality_scale.yaml`.
 
 ## What Improved
 
@@ -31,9 +31,8 @@ implemented in `quality_scale.yaml`.
 
 ## Silver And Gold Baseline
 
-The branch now enforces the Silver coverage baseline in CI and marks the tracked
-Bronze, Silver, and Gold rules as done only where code, tests, documentation,
-and repository checks support the claim. Continue adding real-device or
+CI enforces an aggregate 95% coverage floor, not HA's per-module requirement.
+Complete flow coverage and monitoring availability also remain open. Continue adding real-device or
 recorded-response coverage for permission-denied fan, update, backup, and
 snapshot write endpoints so firmware changes do not regress the baseline.
 

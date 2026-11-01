@@ -39,7 +39,7 @@ async def test_console_redirects_never_forward_credentials(
         client = UnifiUnasApiClient(
             session, host=origin.host, port=origin.port, use_ssl=False,
             username="test-user" if operation == "login" else "",
-            password="test-password" if operation == "login" else "",
+            password="test-pass" if operation == "login" else "",
             api_key=None if operation == "login" else "test-api-key",
         )
         if operation == "root":

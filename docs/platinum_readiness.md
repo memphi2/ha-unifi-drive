@@ -45,8 +45,10 @@ documentation, and repository checks do not all support a `done` claim.
 
 ## Silver And Gold Baseline
 
-The tracked Bronze, Silver, and Gold rules are now implemented for the custom
-integration baseline. Keep adding HA-backed and live-device coverage for reload,
+The tracked rules include implemented behavior and documented gaps; complete
+Bronze, Silver, and Gold compliance is not claimed. In particular, flow coverage,
+per-module coverage and cached sensor availability remain open. Keep adding
+HA-backed and live-device coverage for reload,
 offline startup, recovery, update, backup, fan, and snapshot permission profiles
 so future firmware differences do not erode that baseline.
 

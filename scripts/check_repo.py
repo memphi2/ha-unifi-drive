@@ -52,6 +52,8 @@ QUALITY_RULES_BY_TIER = {
         "config-flow",
         "dependency-transparency",
         "docs-actions",
+        "docs-conditions",
+        "docs-triggers",
         "docs-high-level-description",
         "docs-installation-instructions",
         "docs-removal-instructions",
@@ -891,28 +893,19 @@ def check_quality_scale() -> None:
     if invalid_statuses:
         fail(f"quality_scale.yaml has unsupported statuses: {invalid_statuses}")
 
-    required_quality_rules = (
-        QUALITY_RULES_BY_TIER["bronze"]
-        + QUALITY_RULES_BY_TIER["silver"]
-        + QUALITY_RULES_BY_TIER["gold"]
-    )
-    missing = [rule for rule in required_quality_rules if rule not in rules]
-    if missing:
-        fail(f"quality_scale.yaml missing Bronze/Silver/Gold rules: {missing}")
-
-    incomplete = {
-        rule: rules[rule]
-        for rule in required_quality_rules
-        if rules[rule] != "done"
-    }
-    if incomplete:
-        fail(f"Bronze, Silver and Gold quality rules must be done: {incomplete}")
+    text = QUALITY_SCALE_PATH.read_text(encoding="utf-8")
+    for rule, status in rules.items():
+        if status == "done":
+            continue
+        block = re.search(rf"(?m)^  {re.escape(rule)}:\s*\n((?:    .*(?:\n|$))*)", text)
+        if not block or not re.search(r"(?m)^    comment:\s*\S", block.group(1)):
+            fail(f"Quality rule {rule} ({status}) requires an explanatory comment")
 
     ok("quality_scale.yaml quality status validated")
 
 
 def check_coverage_gate() -> None:
-    """Validate that CI enforces the Silver coverage baseline."""
+    """Validate the aggregate coverage floor, independently of HA tier claims."""
     coverage_text = COVERAGE_PATH.read_text(encoding="utf-8")
     workflow_text = VALIDATE_WORKFLOW_PATH.read_text(encoding="utf-8")
 

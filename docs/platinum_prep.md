@@ -19,9 +19,9 @@ It does not claim official Home Assistant Core certification.
 - `inject-websession`: `done`
 - `strict-typing`: `todo`
 
-The remaining Platinum gap is intentionally honest: strict typing coverage is
-strong for core runtime and helper layers, but not yet complete for all platform
-and flow modules.
+Strict typing remains incomplete for platform and flow modules. Lower-tier gaps
+also remain: full flow coverage, more than 95% coverage per module, and sensor
+availability while core monitoring intentionally retains offline cached values.
 
 ## Evidence Already In Place
 

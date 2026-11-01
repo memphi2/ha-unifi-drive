@@ -109,12 +109,16 @@ Versions before `0.8.0` must be removed and reinstalled; follow the
 
 ## Data Updates
 
-Monitoring uses local polling with a minimum interval of 30 seconds. Unsupported
-optional endpoints do not stop core monitoring. Brief connection failures retain
-the last known values; persistent failures mark monitoring entities unavailable.
+Monitoring uses local polling with a minimum interval of 30 seconds. Optional
+polling has a shared ten-second time budget so slow endpoints cannot hold core
+updates indefinitely. Snapshot inventory normally refreshes every ten minutes.
 
-A powered-off NAS is expected: monitoring becomes unavailable and recovers after
-the device returns. Being offline alone should not trigger repair prompts.
+After two consecutive connection failures, `Device online` reports off and
+`System status` reports offline. Core monitoring sensors retain their last known
+readings; these are cached values, not current measurements. Gate automations on
+`Device online` before using them. Local controls become unavailable while offline.
+
+A powered-off NAS is expected. Being offline alone does not trigger repair prompts.
 Wake-on-LAN remains available when configured; discovery and broadcast delivery
 depend on your network, especially across VLANs.
 
@@ -181,8 +185,9 @@ Removal does not delete NAS data or revoke device-side accounts/API keys.
 Core monitoring is mature beta, discovery is hardened beta, and snapshot
 inventory is beta. Local controls remain experimental.
 
-Development is Platinum-oriented. The tracked Bronze, Silver and Gold rules and
-remaining Platinum work are documented in
+Development is Platinum-oriented, but full Bronze/Silver/Gold compliance is not
+claimed. Flow coverage, per-module coverage, cached sensor availability and strict
+typing still have documented gaps in
 [quality_scale.yaml](custom_components/unifi_unas/quality_scale.yaml) and the
 [quality roadmap](docs/platinum_prep.md). This is not official Home Assistant
 Core certification.
