@@ -39,6 +39,16 @@ cannot prove authorship, provenance or trademark clearance. The dashboard image
 in this repository illustrates the companion Home Assistant card, not a vendor
 web interface. Keep private names, addresses and account details out of screenshots.
 
+### Recorded Image Source
+
+`docs/images/drive-storage-card.png` is byte-identical to
+[`assets/screenshot-card.png` in the companion card repository](https://github.com/memphi2/ha-unifi-drive-card/blob/ada5132aa6a7ff9f7cd323a07192df7720b750e8/assets/screenshot-card.png).
+The source project carries an [MIT license](https://github.com/memphi2/ha-unifi-drive-card/blob/ada5132aa6a7ff9f7cd323a07192df7720b750e8/LICENSE)
+with copyright attributed to memphi2. Its screenshot depicts the companion
+Home Assistant dashboard, not a vendor web interface. The copied image has
+SHA-256 `0f3f73ed2b4e7c81c994cf296f63ab37c1aee6da2d9121fa0892b9f43f23ace6`.
+This source record does not grant rights to third-party marks depicted in UI text.
+
 This policy is not a legal opinion or vendor authorization. Relevant references
 include the [MIT license text](https://opensource.org/license/mit) and
 [Ubiquiti's published trademark guidelines](https://dl.ui.com/compliance/Trademark_Guidelines_v2.pdf).
