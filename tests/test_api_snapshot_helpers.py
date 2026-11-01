@@ -1337,6 +1337,11 @@ def test_snapshot_wrapper_methods_retry_once_after_invalid_auth() -> None:
     assert client.login_count == 1
 
     class RetryWriteClient(SnapshotAuthRetryClient):
+        _snapshot_settings_lock = asyncio.Lock()
+
+        async def async_get_snapshot_settings(self):
+            return [{"id": "user-1", "type": "mydrive"}]
+
         async def _async_update_snapshot_target_settings_once(self, target, update):
             if self.fail_once:
                 self.fail_once = False
@@ -1350,6 +1355,48 @@ def test_snapshot_wrapper_methods_retry_once_after_invalid_auth() -> None:
         )
     )
     assert client.login_count == 1
+
+
+def test_snapshot_settings_serialize_and_merge_fresh_target_state() -> None:
+    """Concurrent limit and schedule writes must preserve both changes."""
+    from tests.api_client_stubs import UnifiUnasApiClient
+
+    async def run():
+        client = UnifiUnasApiClient(object(), host="console.example", api_key="test-key")
+        current = {"id": "target-1", "type": "shared", "max_count": 10, "schedule_time": "01:00"}
+        stale = dict(current)
+        writes = []
+
+        async def read():
+            await asyncio.sleep(0)
+            return [dict(current)]
+
+        async def write(target, update):
+            await asyncio.sleep(0)
+            current.update(target)
+            if update.max_count is not None:
+                current["max_count"] = update.max_count
+            if update.schedule_time is not None:
+                current["schedule_time"] = update.schedule_time
+            writes.append(dict(current))
+
+        client.async_get_snapshot_settings = read
+        client._async_update_snapshot_target_settings_once = write
+        await asyncio.gather(
+            client.async_update_snapshot_target_settings(stale, max_count=20),
+            client.async_update_snapshot_target_settings(stale, schedule_time="02:00"),
+        )
+        assert current["max_count"] == 20
+        assert current["schedule_time"] == "02:00"
+        assert len(writes) == 2
+
+        current["id"] = "replacement-target"
+        with pytest.raises(api_snapshot_module.UnexpectedResponse, match="no longer available"):
+            await client.async_update_snapshot_target_settings(stale, max_count=30)
+        assert len(writes) == 2
+        assert not client._snapshot_settings_lock.locked()
+
+    asyncio.run(run())
 
 
 def test_snapshot_create_405_marks_endpoint_unsupported() -> None:

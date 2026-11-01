@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
@@ -50,7 +51,7 @@ from .snapshot_schedule import (
     _snapshot_schedule_time,
     _snapshot_schedule_weekdays,
 )
-from .snapshot_types import normalize_snapshot_target_type, snapshot_target_type
+from .snapshot_types import normalize_snapshot_target_type, snapshot_target_key, snapshot_target_type
 from .snapshot_values import (
     _bool_value,
     _dict_from_item,
@@ -99,6 +100,7 @@ class ApiSnapshotMixin:
     _snapshot_inventory_supported: bool | None
     _snapshot_inventory_supported_by_type: dict[str, bool]
     _snapshot_settings_read_supported: bool | None
+    _snapshot_settings_lock: asyncio.Lock
     _snapshot_settings_write_supported: bool | None
     _snapshot_settings_write_supported_by_type: dict[str, bool]
 
@@ -252,17 +254,29 @@ class ApiSnapshotMixin:
             schedule_weekdays=schedule_weekdays,
             schedule_monthdays=schedule_monthdays,
         )
-        await self._ensure_authenticated()
-        try:
-            await self._async_update_snapshot_target_settings_once(target, update)
-        except InvalidAuth:
-            _LOGGER.debug(
-                "UNAS session expired before snapshot settings write; "
-                "retrying login once"
+        # Settings are full-document writes. Serialize across platforms and
+        # services, and never merge a change into a caller's stale target copy.
+        async with self._snapshot_settings_lock:
+            target_key = snapshot_target_key(target)
+            current = next(
+                (item for item in await self.async_get_snapshot_settings()
+                 if target_key and snapshot_target_key(item) == target_key),
+                None,
             )
-            self._authenticated = False
-            await self.async_login()
-            await self._async_update_snapshot_target_settings_once(target, update)
+            if current is None:
+                raise UnexpectedResponse(
+                    "Snapshot target is no longer available. Refresh the target list before retrying."
+                )
+            try:
+                await self._async_update_snapshot_target_settings_once(current, update)
+            except InvalidAuth:
+                _LOGGER.debug(
+                    "UNAS session expired before snapshot settings write; "
+                    "retrying login once"
+                )
+                self._authenticated = False
+                await self.async_login()
+                await self._async_update_snapshot_target_settings_once(current, update)
 
     async def _async_get_snapshot_settings_once(self) -> list[dict[str, Any]]:
         """Read snapshot settings from the configured endpoint."""
