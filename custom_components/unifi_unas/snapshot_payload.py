@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from .api_errors import UnexpectedResponse
 from .snapshot_schedule import _snapshot_schedule_frequency, _snapshot_schedule_time
 from .snapshot_types import normalize_snapshot_target_type
 from .snapshot_values import (
@@ -13,6 +14,27 @@ from .snapshot_values import (
     _first_int_value,
     _value_from_dict,
 )
+
+
+def validated_snapshot_settings(
+    payload: Any, *, current_user_id: str | None = None,
+) -> list[dict[str, Any]]:
+    """Reject malformed reads before they can replace the known target list."""
+    data = payload.get("data", payload) if isinstance(payload, dict) else payload
+    if isinstance(data, list):
+        item_count = len(data)
+    elif isinstance(data, dict) and {"personal", "shared"}.intersection(data):
+        sections = [data[key] for key in ("personal", "shared") if key in data]
+        if not all(isinstance(section, list) for section in sections):
+            raise UnexpectedResponse("Invalid snapshot settings response structure")
+        item_count = sum(len(section) for section in sections)
+    else:
+        raise UnexpectedResponse("Invalid snapshot settings response structure")
+
+    settings = extract_snapshot_settings(payload, current_user_id=current_user_id)
+    if len(settings) != item_count:
+        raise UnexpectedResponse("Snapshot settings response contains unreadable targets")
+    return settings
 
 
 def extract_snapshot_settings(

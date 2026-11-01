@@ -1309,13 +1309,42 @@ def test_snapshot_settings_read_distinguishes_empty_targets_from_server_errors()
     client = SnapshotWriteClient()
     client._snapshot_settings_read_supported = None
     client._login_data = {}
-    client.responses = [(200, {"unexpected": "shape"})]
+    client.responses = [(200, {"data": {"personal": [], "shared": []}})]
     assert asyncio.run(client._async_get_snapshot_settings_once()) == []
     assert client.snapshot_settings_read_supported is True
 
     client.responses = [(500, {"error": "server"})]
     with pytest.raises(api_snapshot_module.CannotConnect, match="HTTP 500"):
         asyncio.run(client._async_get_snapshot_settings_once())
+
+
+@pytest.mark.parametrize("payload", [
+    None, "<html>Example login</html>", {}, {"error": "example"},
+    {"data": {"unknown": []}}, {"personal": None}, {"shared": {}},
+    {"shared": [None]}, {"shared": [{"unknown": "example"}]},
+    [{"type": "unknown", "id": "example"}],
+    {"shared": [{"sharedDrive": {"id": "a", "name": "Example"}}, {}]},
+])
+def test_snapshot_settings_rejects_malformed_success_response(payload) -> None:
+    """An HTTP success does not make an unknown or partial target list valid."""
+    client = SnapshotWriteClient()
+    client._snapshot_settings_read_supported = None
+    client._login_data = {}
+    client.responses = [(200, payload)]
+    with pytest.raises(api_snapshot_module.UnexpectedResponse):
+        asyncio.run(client._async_get_snapshot_settings_once())
+    assert client.snapshot_settings_read_supported is None
+
+
+@pytest.mark.parametrize("payload", [[], {"data": []}, {"shared": []}, {"personal": []}])
+def test_snapshot_settings_accepts_known_empty_response(payload) -> None:
+    """Recognized empty list variants are authoritative empty target sets."""
+    client = SnapshotWriteClient()
+    client._snapshot_settings_read_supported = None
+    client._login_data = {}
+    client.responses = [(200, payload)]
+    assert asyncio.run(client._async_get_snapshot_settings_once()) == []
+    assert client.snapshot_settings_read_supported is True
 
 
 def test_snapshot_wrapper_methods_retry_once_after_invalid_auth() -> None:

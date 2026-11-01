@@ -833,7 +833,10 @@ def test_snapshot_inventory_refresh_runtime_errors_preserve_refresh_request() ->
     assert coordinator.snapshot_inventory == {}
 
 
-def test_snapshot_settings_transient_errors_preserve_targets_and_recover() -> None:
+@pytest.mark.parametrize("error_type", [
+    coordinator_module.CannotConnect, coordinator_module.UnexpectedResponse,
+])
+def test_snapshot_settings_transient_errors_preserve_targets_and_recover(error_type) -> None:
     """Failed reads must retain the last target list without advancing missing counts."""
     target = {"id": "target-1", "type": "shared"}
 
@@ -843,7 +846,7 @@ def test_snapshot_settings_transient_errors_preserve_targets_and_recover() -> No
 
         async def async_get_snapshot_settings(self):
             if self.fail:
-                raise coordinator_module.CannotConnect("HTTP 503")
+                raise error_type("Snapshot read failed")
             return [target]
 
     client = Client()

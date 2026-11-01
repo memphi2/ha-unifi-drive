@@ -37,6 +37,7 @@ from .snapshot_payload import (
     _snapshot_target_type_normalized,
     _user_display_name,
     extract_snapshot_settings,
+    validated_snapshot_settings,
 )
 from .snapshot_schedule import (
     _schedule_time_parts,
@@ -292,12 +293,12 @@ class ApiSnapshotMixin:
                 f"Snapshot settings could not be read (HTTP {status}). Retry later."
             )
 
-        self._snapshot_settings_read_supported = True
         current_user_id = self._current_user_id()
-        settings = self._extract_snapshot_settings(
+        settings = validated_snapshot_settings(
             payload,
             current_user_id=current_user_id,
         )
+        self._snapshot_settings_read_supported = True
         _LOGGER.debug(
             "Snapshot settings endpoint %s returned %s target(s)",
             SNAPSHOT_SETTINGS_PATH,
