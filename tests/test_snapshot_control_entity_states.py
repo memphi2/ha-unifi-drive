@@ -271,6 +271,65 @@ class _SnapshotIntegrationClient:
 
 
 @pytest.mark.asyncio
+async def test_snapshot_recorder_omits_preview_but_keeps_live_attributes(hass) -> None:
+    """Real HA states retain previews while recorder serializes only useful history."""
+    import json
+
+    from homeassistant.components.recorder.db_schema import StateAttributes
+    from homeassistant.const import EVENT_STATE_CHANGED
+    from homeassistant.core import Event
+
+    from custom_components.unifi_unas.snapshot_types import snapshot_target_key
+
+    target = _snapshot_target_with_controls()
+    client = _SnapshotIntegrationClient([target])
+    entry, _ = await _setup_snapshot_controls(hass, client)
+    entity_id = next(
+        entity_id for uid, entity_id in _snapshot_entity_ids_by_unique_id(hass, entry).items()
+        if uid.endswith("_inventory")
+    )
+    coordinator = entry.runtime_data
+    key = snapshot_target_key(target)
+
+    def recorded(state):
+        return StateAttributes.shared_attrs_bytes_from_event(
+            Event(EVENT_STATE_CHANGED, {"entity_id": entity_id, "old_state": None, "new_state": state}),
+            None,
+        )
+
+    coordinator.snapshot_inventory[key] = {
+        "snapshot_count": 12, "snapshot_count_source": "inventory_total",
+        "snapshot_names": ["snapshot-a"], "recent_snapshots": [{"name": "snapshot-a"}],
+    }
+    coordinator.async_set_updated_data(coordinator.data)
+    await hass.async_block_till_done()
+    state = hass.states.get(entity_id)
+    assert state is not None and state.state == "12"
+    assert state.attributes["snapshot_names"] == ["snapshot-a"]
+    before = recorded(state)
+    assert "snapshot_names" not in json.loads(before)
+    assert "recent_snapshots" not in json.loads(before)
+    assert json.loads(before)["snapshot_count_source"] == "inventory_total"
+
+    coordinator.snapshot_inventory[key]["snapshot_names"] = ["snapshot-b"]
+    coordinator.snapshot_inventory[key]["recent_snapshots"] = [{"name": "snapshot-b"}]
+    coordinator.async_set_updated_data(coordinator.data)
+    await hass.async_block_till_done()
+    updated = hass.states.get(entity_id)
+    assert updated.attributes["snapshot_names"] == ["snapshot-b"]
+    assert recorded(updated) == before
+
+    changes = []
+    unsub = hass.bus.async_listen(EVENT_STATE_CHANGED, lambda event: changes.append(event))
+    try:
+        coordinator.async_set_updated_data(coordinator.data)
+        await hass.async_block_till_done()
+        assert not [event for event in changes if event.data["entity_id"] == entity_id]
+    finally:
+        unsub()
+
+
+@pytest.mark.asyncio
 async def test_snapshot_control_entities_report_state_in_home_assistant(hass) -> None:
     """Create snapshot entities should expose expected HA state and attributes."""
     from custom_components.unifi_unas.snapshot_types import snapshot_target_key

@@ -1,5 +1,18 @@
 # Live DB Write Probe
 
+Historical evidence only: this short probe predates the current release branch.
+The original record does not identify the exact HA version or commit; its row
+counts are not a current performance guarantee.
+
+Current recorder policy keeps snapshot previews, names, IDs and descriptions
+in live HA attributes, but excludes them from recorded attributes. Pool binary
+sensors likewise exclude duplicate rebuild/sync progress attributes; dedicated
+progress sensors remain recordable. Counts, timestamps and health history remain.
+Tests use HA's recorder serializer and verify that identical refreshes do not
+emit new snapshot sensor state-change events. This reduces attribute payloads;
+it does not promise zero state rows when live-only attributes change. A new
+long-duration live DB probe is still required for device-specific row rates.
+
 This report documents the live recorder/config-entry write probe performed
 during discovery write-throttle hardening on the Home Assistant test instance.
 It excludes credentials, tokens, private hostnames, and local network details.

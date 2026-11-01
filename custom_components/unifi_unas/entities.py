@@ -329,6 +329,12 @@ class UnifiUnasSnapshotInventorySensor(
 
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_state_class = SensorStateClass.MEASUREMENT
+    _unrecorded_attributes = frozenset({
+        "latest_snapshot_id", "oldest_snapshot_id",
+        "latest_snapshot_name", "oldest_snapshot_name",
+        "latest_snapshot_description", "oldest_snapshot_description",
+        "snapshot_ids", "snapshot_names", "snapshot_descriptions", "recent_snapshots",
+    })
 
     def __init__(
         self,

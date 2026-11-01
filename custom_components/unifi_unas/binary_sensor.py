@@ -159,6 +159,7 @@ class UnifiUnasAggregateBinarySensor(UnifiUnasBaseBinarySensor):
 class UnifiUnasPoolBinarySensor(UnifiUnasBaseBinarySensor):
     """Per-pool UNAS binary sensor."""
 
+    _unrecorded_attributes = frozenset({"rebuild_progress", "sync_progress"})
     entity_description: PoolBinarySensorDescription
 
     def __init__(
