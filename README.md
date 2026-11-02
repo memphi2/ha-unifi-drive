@@ -216,6 +216,7 @@ Core certification.
 - [Device and firmware compatibility](docs/firmware_matrix.md)
 - [Troubleshooting](docs/troubleshooting.md) and [limitations](docs/known_limitations.md)
 - [Maintenance and LTS policy](docs/lts.md)
+- [Recorder history and database growth](docs/recorder.md)
 - [Validation and contribution checks](docs/validation.md)
 
 ## Legal Notes

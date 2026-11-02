@@ -683,6 +683,10 @@ def test_strict_typing_foundation_requires_typed_runtime_entry(
         "custom_components/unifi_unas/storage_helpers.py",
         "custom_components/unifi_unas/snapshot_payload.py",
     )
+    mypy_files = tuple(sorted(set(mypy_files) | {
+        f"custom_components/unifi_unas/{filename}"
+        for filename in module.TYPED_CONFIG_ENTRY_FILES
+    }))
     for relative_path in mypy_files:
         path = tmp_path / relative_path
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -711,6 +715,12 @@ def test_strict_typing_foundation_requires_typed_runtime_entry(
 
     module.check_strict_typing_foundation()
 
+    new_module = integration_dir / "new_platform.py"
+    new_module.write_text("VALUE = 1\n", encoding="utf-8")
+    with pytest.raises(SystemExit):
+        module.check_strict_typing_foundation()
+    new_module.unlink()
+
     mypy_path.write_text(
         mypy_config.replace("custom_components/unifi_unas/api.py, ", ""),
         encoding="utf-8",
@@ -725,6 +735,33 @@ def test_strict_typing_foundation_requires_typed_runtime_entry(
     )
     with pytest.raises(SystemExit):
         module.check_strict_typing_foundation()
+
+
+def test_imported_ha_typing_gate_rejects_skipped_imports(tmp_path, monkeypatch):
+    module = _load_check_repo_module()
+    config = (
+        "[mypy]\nstrict = True\nfollow_imports = silent\n"
+        "disallow_any_unimported = True\ndisallow_any_expr = True\n"
+        "files = scripts/typecheck_ha_contract.py, custom_components/unifi_unas/device.py\n"
+    )
+    path = tmp_path / "mypy-ha.ini"
+    path.write_text(config)
+    for name in ("scripts/typecheck_ha_contract.py", "custom_components/unifi_unas/device.py"):
+        file = tmp_path / name
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_text("# Synthetic typing contract fixture\n")
+    workflow = tmp_path / "validate.yml"
+    workflow.write_text("run: mypy --config-file mypy-ha.ini\n")
+    monkeypatch.setattr(module, "ROOT", tmp_path)
+    monkeypatch.setattr(module, "VALIDATE_WORKFLOW_PATH", workflow)
+    module.check_imported_ha_typing_gate()
+    path.write_text(config.replace("silent", "skip"))
+    with pytest.raises(SystemExit):
+        module.check_imported_ha_typing_gate()
+    path.write_text(config)
+    workflow.write_text("run: true\n")
+    with pytest.raises(SystemExit):
+        module.check_imported_ha_typing_gate()
 
 
 def test_exception_translation_check_rejects_direct_raises(

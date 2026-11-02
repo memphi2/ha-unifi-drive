@@ -13,6 +13,11 @@
 - Offline monitoring retains cached readings. Use Device online to guard
   automations that need current measurements.
 - Local synthetic tests do not replace long-running device/Recorder validation.
+- HTTP responses larger than 8 MiB are rejected for runtime safety. Very large
+  inventories may require follow-up rather than raising the limit blindly.
+- Entities for previously observed snapshot targets remain registered for
+  existing automations and missing-target handling. Continually creating new
+  target IDs therefore grows the registry; repeated polling alone should not.
 - Real-device lifecycle validation is strongest on the tested UNAS2 target.
   Throughput has been confirmed for the UNAS2 and UNAS4 firmware combinations
   listed in the firmware matrix, but other feature/model/firmware combinations

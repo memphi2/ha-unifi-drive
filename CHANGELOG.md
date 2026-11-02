@@ -1,5 +1,26 @@
 # Changelog
 
+## v0.9.0 - Runtime safety and quality validation
+
+- Limits decompressed HTTP response bodies to 8 MiB across monitoring, login,
+  errors and local actions, with chunked/compressed response and recovery tests.
+- Fixes reauthentication and reconfiguration on the supported HA 2024.8 baseline;
+  real HA flow-manager tests verify identity protection, retry, cancellation,
+  options validation and reload behavior.
+- Adds stateful local HTTP tests, real SQLite Recorder write regressions and
+  bounded lifecycle/continuous-polling measurements without contacting a live NAS.
+- Checks every integration module with strict Mypy and verifies selected runtime,
+  entry and device metadata boundaries against imported HA types.
+- Adds weekly resource measurements and verifies release tags, notes and ZIP
+  contents against Git. Validation is independent of the companion card.
+- Updates quality metadata, history-profile guidance and release documentation
+  without claiming completed Platinum compliance or new live compatibility tests.
+
+Existing `0.8.0+` entries update in place. The older pre-`0.8.0` domain migration
+still requires removal and reinstallation. Cached offline readings, Wake-on-LAN
+and experimental local controls are unchanged. Recorder retention/statistics/purge
+changes remain deferred; this release does not modify global Recorder settings.
+
 ## v0.8.9 - Runtime hardening and performance maintenance
 
 - Stops snapshot write retries after ambiguous failures, rejects malformed target

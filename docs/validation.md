@@ -5,6 +5,23 @@ validation.
 
 ## Required Local Gate
 
+Additional regression commands and their scope:
+
+- [Recorder measurements and history profiles](recorder.md)
+- [Bounded RAM/task lifecycle measurements](runtime_measurements.md)
+
+Verify a committed candidate locally with `python scripts/release_check.py`.
+After publication, verify the exact approved tag, release notes and downloaded
+installation ZIP against Git content:
+
+```bash
+python scripts/release_check.py --ref v0.9.0 --published
+```
+
+Use the tag being checked, not an unrelated development HEAD. The release
+workflow now runs the published-artifact check automatically after upload.
+This command is read-only on GitHub and does not merge, tag or publish anything.
+
 ```bash
 python scripts/check_repo.py
 python scripts/audit_github_public_surfaces.py --repo memphi2/ha-unifi-drive
@@ -24,6 +41,7 @@ Run when the environment provides the tooling:
 ```bash
 python -m ruff check custom_components tests scripts
 mypy --config-file mypy.ini
+mypy --config-file mypy-ha.ini
 python -m bandit -q -r custom_components scripts
 ```
 
@@ -40,6 +58,8 @@ python -m bandit -q -r custom_components scripts
 - quality-scale status validation
 - translation structure validation
 - typed runtime-data baseline and strict mypy gate structure
+- an additional imported-HA type gate for runtime, read-only entry and device
+  metadata contracts, run against each matrix environment's actual HA types
 - icon/exception translation baseline
 - full integration unit/fixture test suite
 
@@ -81,7 +101,9 @@ Require completed Code Review of the final PR head and resolve actionable findin
 Record its SHA and evidence link in the PR. New commits require fresh review.
 Allow automatic reviews to finish without duplicate manual requests.
 Separate Security Review and access to its full report are optional, not release
-gates. Do not claim clearance for uninspected reports. CodeQL, Bandit, dependency
+gates, including for future releases. Do not request a full Security Report as
+a publication prerequisite. Do not claim clearance for uninspected reports.
+CodeQL, Bandit, dependency
 checks and privacy/legal audits remain required. Preserve branch protections.
 
 ## Release Readiness Rule
@@ -109,7 +131,7 @@ changes; changed content requires fresh review before publication. A clean revie
 does not grant permission to merge, tag or publish without explicit approval.
 
 The HA `2026.10.4` maintenance release has a separate
-[v0.8.9 checklist](release_0.8.9.md). HA `2026.11` and Marketplace lifecycle
+[v0.9.0 checklist](release_0.9.0.md). HA `2026.11` and Marketplace lifecycle
 validation are follow-up gates for claiming that compatibility, not prerequisites
 for this release on the tested HA baseline. Do not treat beta smoke tests as proof
 of stable HA or Marketplace compatibility.

@@ -40,8 +40,8 @@ async def async_setup_entry(
 
 
 class UnifiUnasSnapshotLimitNumber(
-    UnifiUnasSnapshotTargetEntity, NumberEntity
-):  # type: ignore[misc]
+    UnifiUnasSnapshotTargetEntity, NumberEntity  # type: ignore[misc]
+):
     """Number that configures snapshot retention limit for a target."""
 
     _attr_native_min_value = MIN_SNAPSHOT_LIMIT
@@ -89,8 +89,8 @@ class UnifiUnasSnapshotLimitNumber(
 
 
 class UnifiUnasSnapshotMonthlyDayNumber(
-    UnifiUnasSnapshotTargetEntity, NumberEntity
-):  # type: ignore[misc]
+    UnifiUnasSnapshotTargetEntity, NumberEntity  # type: ignore[misc]
+):
     """Number that configures the primary monthly snapshot day."""
 
     _attr_native_min_value = 1

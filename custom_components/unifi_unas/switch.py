@@ -34,8 +34,8 @@ async def async_setup_entry(
 
 
 class UnifiUnasSnapshotEnabledSwitch(
-    UnifiUnasSnapshotTargetEntity, SwitchEntity
-):  # type: ignore[misc]
+    UnifiUnasSnapshotTargetEntity, SwitchEntity  # type: ignore[misc]
+):
     """Switch that enables snapshot protection for a target."""
 
     def __init__(

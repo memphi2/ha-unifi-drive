@@ -17,7 +17,7 @@ from .system_metadata import (
 
 
 def build_device_info(
-    coordinator: Any,
+    coordinator: object,
     entry: UnifiDriveConfigEntry,
     device_identifier: str,
     *,
@@ -37,17 +37,19 @@ def build_device_info(
     )
     sw_version = _unifi_os_version(payload)
 
-    kwargs: dict[str, Any] = {
-        "identifiers": {(DOMAIN, device_identifier)},
-        "manufacturer": "Ubiquiti",
-        "model": model,
-        "name": entry.title,
-        "configuration_url": configuration_url
-        or getattr(getattr(coordinator, "client", None), "base_url", None),
-    }
+    url = configuration_url or getattr(getattr(coordinator, "client", None), "base_url", None)
+    # Omit unknown firmware instead of clearing a previously registered version.
     if sw_version:
-        kwargs["sw_version"] = sw_version
-    return DeviceInfo(**kwargs)
+        return DeviceInfo(
+            identifiers={(DOMAIN, device_identifier)}, manufacturer="Ubiquiti",
+            model=model, name=entry.title, sw_version=sw_version,
+            configuration_url=url if isinstance(url, str) else None,
+        )
+    return DeviceInfo(
+        identifiers={(DOMAIN, device_identifier)}, manufacturer="Ubiquiti",
+        model=model, name=entry.title,
+        configuration_url=url if isinstance(url, str) else None,
+    )
 
 
 def device_registry_metadata(device_info: DeviceInfo) -> dict[str, str]:
@@ -65,7 +67,7 @@ def device_registry_metadata(device_info: DeviceInfo) -> dict[str, str]:
     return metadata
 
 
-def _device_metadata_payload(coordinator: Any) -> dict[str, Any]:
+def _device_metadata_payload(coordinator: object) -> dict[str, Any]:
     """Return the best available system metadata payload for device info."""
     payload = getattr(coordinator, "data", None)
     if isinstance(payload, dict):

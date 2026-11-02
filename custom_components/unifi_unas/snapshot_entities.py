@@ -209,7 +209,7 @@ def _update_snapshot_target_missing_state(
 
 class UnifiUnasSnapshotTargetEntity(
     UnifiUnasDeviceInfoMixin,
-    CoordinatorEntity[UnifiUnasCoordinator],
+    CoordinatorEntity[UnifiUnasCoordinator],  # type: ignore[misc]
 ):
     """Base entity for one UniFi Drive snapshot target."""
 

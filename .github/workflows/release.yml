@@ -92,3 +92,9 @@ jobs:
           files: dist/unifi_unas.zip
           body_path: ${{ steps.release_notes.outputs.body_path }}
           generate_release_notes: false
+
+      - name: Verify published tag, notes and installation artifact
+        env:
+          GH_TOKEN: ${{ github.token }}
+          UNIFI_UNAS_FORBIDDEN_MARKERS: ${{ vars.UNIFI_UNAS_FORBIDDEN_MARKERS }}
+        run: python scripts/release_check.py --ref "$GITHUB_SHA" --published --repo "$GITHUB_REPOSITORY"

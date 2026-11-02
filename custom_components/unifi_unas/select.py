@@ -67,8 +67,8 @@ async def async_setup_entry(
 
 
 class UnifiUnasFanModeSelect(
-    CoordinatorEntity[UnifiUnasCoordinator], SelectEntity, RestoreEntity
-):  # type: ignore[misc]
+    CoordinatorEntity[UnifiUnasCoordinator], SelectEntity, RestoreEntity  # type: ignore[misc]
+):
     """Select for the native UniFi Drive fan mode."""
 
     _attr_has_entity_name = True
@@ -185,8 +185,8 @@ class UnifiUnasFanModeSelect(
 
 
 class UnifiUnasSnapshotScheduleSelect(
-    UnifiUnasSnapshotTargetEntity, SelectEntity
-):  # type: ignore[misc]
+    UnifiUnasSnapshotTargetEntity, SelectEntity  # type: ignore[misc]
+):
     """Select that configures snapshot schedule frequency."""
 
     _attr_options = list(SNAPSHOT_SCHEDULE_OPTIONS)
@@ -229,8 +229,8 @@ class UnifiUnasSnapshotScheduleSelect(
 
 
 class UnifiUnasSnapshotWeekdaySelect(
-    UnifiUnasSnapshotTargetEntity, SelectEntity
-):  # type: ignore[misc]
+    UnifiUnasSnapshotTargetEntity, SelectEntity  # type: ignore[misc]
+):
     """Select that configures the primary weekly snapshot day."""
 
     _attr_options = list(SNAPSHOT_WEEKDAY_OPTIONS)
