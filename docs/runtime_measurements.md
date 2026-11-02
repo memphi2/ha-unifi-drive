@@ -7,7 +7,9 @@ run in the same HA test environment:
 python scripts/check_runtime_soak.py --cycles 30 --idle-seconds 1 --json-output /tmp/unas-soak.json
 ```
 
-The runner checks setup, offline/recovery, changing snapshot counts and unload.
+The runner checks setup, offline/recovery, rotating synthetic snapshot targets,
+changing snapshot counts and unload. Target IDs come from a bounded fixture set;
+this does not assert that unlimited creation of new NAS targets is cost-free.
 Two warmup cycles are excluded. Subsequent comparable phases have explicit limits
 for integration allocations, process RSS, tasks, timers and listener counts.
 Unload must leave no retained coordinators, open owned sessions or integration

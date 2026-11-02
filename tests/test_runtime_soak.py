@@ -82,9 +82,15 @@ async def test_repeated_runtime_resources(hass, monkeypatch, caplog):
                 coordinator.client.offline = True
                 coordinator.async_set_updated_data(await coordinator._async_update_data())
                 coordinator.client.offline = False
-                for count in range(4):
-                    coordinator.client.snapshot_settings[0]["total_count"] = count
+                target = _snapshot_target_with_controls()
+                for count in range(12):
+                    coordinator.client.snapshot_settings = [
+                        {**target, "id": f"synthetic-target-{count % 3}", "total_count": count}
+                    ]
                     coordinator.async_set_updated_data(await coordinator._async_update_data())
+                    await hass.async_block_till_done()
+                coordinator.client.snapshot_settings = [target]
+                coordinator.async_set_updated_data(await coordinator._async_update_data())
                 await hass.async_block_till_done()
                 await asyncio.sleep(idle)
                 if cycle >= 2:

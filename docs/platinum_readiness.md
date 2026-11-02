@@ -42,6 +42,14 @@ Rule references: [flow coverage](https://contributors.home-assistant.io/core/qua
 - English/German entity tests cover dynamic labels and stable registry identity.
 - Recorder serializer tests retain live counts while verifying stable recorded
   control attributes across twenty count changes. This is not a live DB-rate test.
+- Real SQLite Recorder tests additionally verify unchanged refreshes, throughput
+  exclusions, cached offline data and snapshot control attribute deduplication.
+- A bounded resource runner measures allocations, RSS, tasks, timers and retained
+  objects after warmup across setup/recovery/unload cycles. It is not a live soak.
+- Stateful loopback HTTP tests cover cookie sessions, expiry, reauthentication,
+  malformed data, optional endpoint failures, timeouts and recovery.
+- The companion-card contract can be checked against freshly exported real HA
+  registry/entity data from synthetic integration setup, not hand-built states.
 
 ## Recommended Work Order
 

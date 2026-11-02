@@ -5,6 +5,24 @@ validation.
 
 ## Required Local Gate
 
+Additional regression commands and their scope:
+
+- [Recorder measurements and history profiles](recorder.md)
+- [Bounded RAM/task lifecycle measurements](runtime_measurements.md)
+- [Real integration/card entity contract](card_contract.md)
+
+Verify a committed candidate locally with `python scripts/release_check.py`.
+After publication, verify the exact approved tag, release notes and downloaded
+installation ZIP against Git content:
+
+```bash
+python scripts/release_check.py --ref v0.8.9 --published
+```
+
+Use the tag being checked, not an unrelated development HEAD. The release
+workflow now runs the published-artifact check automatically after upload.
+This command is read-only on GitHub and does not merge, tag or publish anything.
+
 ```bash
 python scripts/check_repo.py
 python scripts/audit_github_public_surfaces.py --repo memphi2/ha-unifi-drive

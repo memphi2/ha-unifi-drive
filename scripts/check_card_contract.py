@@ -3,7 +3,9 @@
 import argparse
 import os
 from pathlib import Path
-import subprocess
+import shutil
+# explicit local test commands, no shell.
+import subprocess  # nosec B404
 import sys
 import tempfile
 
@@ -17,9 +19,13 @@ def main():
     card = args.card_root.resolve()
     if not (card / "test/real-integration-contract.test.ts").is_file():
         parser.error("card checkout must contain the real integration contract test")
+    npm = shutil.which("npm")
+    if npm is None:
+        parser.error("npm is required for companion-card tests")
     with tempfile.TemporaryDirectory(prefix="unas-contract-") as directory:
         output = Path(directory) / "entities.json"
-        result = subprocess.run([sys.executable, "-m", "pytest", "-q", "tests/test_card_contract.py"],
+        # fixed test command.
+        result = subprocess.run([sys.executable, "-m", "pytest", "-q", "tests/test_card_contract.py"],  # nosec B603
                                 cwd=ROOT, env={**os.environ, "UNAS_CARD_CONTRACT_OUTPUT": str(output)},
                                 check=False)
         if result.returncode:
@@ -27,7 +33,8 @@ def main():
         if not output.is_file():
             print("FAIL: HA entity export did not run")
             return 1
-        return subprocess.run(["npm", "test", "--", "test/real-integration-contract.test.ts"],
+        # resolved tool, fixed arguments.
+        return subprocess.run([npm, "test", "--", "test/real-integration-contract.test.ts"],  # nosec B603
                               cwd=card, env={**os.environ, "UNAS_CARD_CONTRACT_FIXTURE": str(output)},
                               check=False).returncode
 

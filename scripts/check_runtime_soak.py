@@ -7,7 +7,8 @@ import json
 import math
 import os
 from pathlib import Path
-import subprocess
+# fixed local test command, no shell.
+import subprocess  # nosec B404
 import sys
 import tempfile
 
@@ -51,7 +52,8 @@ def main():
         report = Path(directory) / "report.json"
         env = {**os.environ, "UNAS_SOAK_CYCLES": str(args.cycles),
                "UNAS_SOAK_IDLE": str(args.idle_seconds), "UNAS_SOAK_REPORT": str(report)}
-        result = subprocess.run(
+        # fixed interpreter and test path.
+        result = subprocess.run(  # nosec B603
             [sys.executable, "-m", "pytest", "-q", "tests/test_runtime_soak.py"],
             cwd=ROOT, env=env, check=False,
         )
