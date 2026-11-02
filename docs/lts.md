@@ -67,7 +67,7 @@ declares an exact dependency on HA `2026.10.4`; it is not suitable as a November
 test baseline. Marketplace documentation and catalog metadata alone do not prove
 runtime compatibility with the November release.
 
-The `v0.8.9` [release checklist](release_0.8.9.md) targets a maintenance release
+The `v0.9.0` [release checklist](release_0.9.0.md) targets a maintenance release
 on HA `2026.10.4`, retaining the tested `2024.8.0` minimum. It does not require
 November to ship. The following gates remain required before claiming HA
 `2026.11` or Marketplace runtime validation; no completed live Marketplace test

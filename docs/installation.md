@@ -66,7 +66,9 @@ Versions before `0.8.0` used the old domain and need the separate procedure belo
    On older Home Assistant versions, use HACS.
 3. Install the update and complete the requested Home Assistant restart.
 4. Check that the existing entry loads and monitoring recovers when the NAS is
-   online. An offline NAS may correctly leave monitoring entities unavailable.
+   online. After connection failures, monitoring retains last-known readings
+   where available; these are not live measurements. Check Device online before
+   relying on them. Controls remain unavailable offline except configured WOL.
 
 Each release's `hacs.json` declares its minimum HA version. An incompatible
 release may not be offered. Catalog refreshes can also delay a newly published
@@ -110,19 +112,6 @@ For a manual update, back up the old integration folder outside
 so obsolete files are not left behind. Leave Home Assistant's `.storage` and
 existing config entries alone. Restart Home Assistant and add an entry only when
 one does not already exist.
-
-## Nested Folder Recovery
-
-The expected file is:
-
-```text
-/config/custom_components/unifi_unas/manifest.json
-```
-
-If it is instead under `unifi_unas/unifi_unas/`, back up the misplaced folder,
-then replace the outer folder with the complete inner integration folder.
-Confirm the expected path above and restart Home Assistant. Do not delete the
-config entry to correct a file-layout problem.
 
 ## Removal
 

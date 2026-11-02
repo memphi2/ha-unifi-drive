@@ -33,6 +33,16 @@
 - This usually indicates permission scope differences on local endpoints.
 - Verify account/API key privileges for fan/update/snapshot/backup actions.
 
+## Response Exceeds The Safety Limit
+
+- Responses above 8 MiB are rejected, including chunked or compressed bodies.
+  Check device load and whether a proxy or unexpected endpoint is returning an
+  unusually large page or inventory.
+- Report the integration, HA and firmware versions with redacted diagnostics;
+  do not attach raw API responses or credentials.
+- After an action fails, check its actual state on the NAS before retrying. A
+  rejected response does not prove that the NAS did not execute the action.
+
 ## Snapshot Targets Missing Or Unavailable
 
 - Enable snapshot controls in options/reconfigure.
