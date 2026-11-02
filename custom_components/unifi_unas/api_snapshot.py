@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
-from .api_errors import InvalidAuth, UnexpectedResponse, UnsupportedFeature
+from .api_errors import CannotConnect, InvalidAuth, UnexpectedResponse, UnsupportedFeature
 from .const import (
     DEFAULT_SNAPSHOT_LIMIT,
     MAX_SNAPSHOT_LIMIT,
@@ -25,7 +26,7 @@ from .snapshot_paths import (
     _snapshot_settings_write_paths,
 )
 from .snapshot_inventory import extract_snapshot_inventory
-from .security import safe_error_text
+from .security import safe_response_summary
 # Re-export helper names from this legacy module path for tests and local callers.
 from .snapshot_payload import (
     _extract_snapshot_settings_from_list,
@@ -36,6 +37,7 @@ from .snapshot_payload import (
     _snapshot_target_type_normalized,
     _user_display_name,
     extract_snapshot_settings,
+    validated_snapshot_settings,
 )
 from .snapshot_schedule import (
     _schedule_time_parts,
@@ -50,7 +52,7 @@ from .snapshot_schedule import (
     _snapshot_schedule_time,
     _snapshot_schedule_weekdays,
 )
-from .snapshot_types import normalize_snapshot_target_type, snapshot_target_type
+from .snapshot_types import normalize_snapshot_target_type, snapshot_target_key, snapshot_target_type
 from .snapshot_values import (
     _bool_value,
     _dict_from_item,
@@ -99,6 +101,7 @@ class ApiSnapshotMixin:
     _snapshot_inventory_supported: bool | None
     _snapshot_inventory_supported_by_type: dict[str, bool]
     _snapshot_settings_read_supported: bool | None
+    _snapshot_settings_lock: asyncio.Lock
     _snapshot_settings_write_supported: bool | None
     _snapshot_settings_write_supported_by_type: dict[str, bool]
 
@@ -252,17 +255,29 @@ class ApiSnapshotMixin:
             schedule_weekdays=schedule_weekdays,
             schedule_monthdays=schedule_monthdays,
         )
-        await self._ensure_authenticated()
-        try:
-            await self._async_update_snapshot_target_settings_once(target, update)
-        except InvalidAuth:
-            _LOGGER.debug(
-                "UNAS session expired before snapshot settings write; "
-                "retrying login once"
+        # Settings are full-document writes. Serialize across platforms and
+        # services, and never merge a change into a caller's stale target copy.
+        async with self._snapshot_settings_lock:
+            target_key = snapshot_target_key(target)
+            current = next(
+                (item for item in await self.async_get_snapshot_settings()
+                 if target_key and snapshot_target_key(item) == target_key),
+                None,
             )
-            self._authenticated = False
-            await self.async_login()
-            await self._async_update_snapshot_target_settings_once(target, update)
+            if current is None:
+                raise UnexpectedResponse(
+                    "Snapshot target is no longer available. Refresh the target list before retrying."
+                )
+            try:
+                await self._async_update_snapshot_target_settings_once(current, update)
+            except InvalidAuth:
+                _LOGGER.debug(
+                    "UNAS session expired before snapshot settings write; "
+                    "retrying login once"
+                )
+                self._authenticated = False
+                await self.async_login()
+                await self._async_update_snapshot_target_settings_once(current, update)
 
     async def _async_get_snapshot_settings_once(self) -> list[dict[str, Any]]:
         """Read snapshot settings from the configured endpoint."""
@@ -274,19 +289,16 @@ class ApiSnapshotMixin:
             self._snapshot_settings_read_supported = False
             return []
         if status < 200 or status >= 300:
-            _LOGGER.debug(
-                "Snapshot settings endpoint %s returned HTTP %s",
-                SNAPSHOT_SETTINGS_PATH,
-                status,
+            raise CannotConnect(
+                f"Snapshot settings could not be read (HTTP {status}). Retry later."
             )
-            return []
 
-        self._snapshot_settings_read_supported = True
         current_user_id = self._current_user_id()
-        settings = self._extract_snapshot_settings(
+        settings = validated_snapshot_settings(
             payload,
             current_user_id=current_user_id,
         )
+        self._snapshot_settings_read_supported = True
         _LOGGER.debug(
             "Snapshot settings endpoint %s returned %s target(s)",
             SNAPSHOT_SETTINGS_PATH,
@@ -351,6 +363,10 @@ class ApiSnapshotMixin:
             return
 
         if last_error is not None:
+            self._set_snapshot_capability(
+                "_snapshot_create_supported", "_snapshot_create_supported_by_type",
+                target_type, False,
+            )
             raise last_error
         raise UnsupportedFeature("Manual snapshot endpoint is not configured.")
 
@@ -373,6 +389,10 @@ class ApiSnapshotMixin:
                 continue
 
         if last_error is not None:
+            self._set_snapshot_capability(
+                "_snapshot_inventory_supported", "_snapshot_inventory_supported_by_type",
+                target_type, False,
+            )
             raise last_error
         raise UnsupportedFeature("Snapshot inventory endpoint is not configured.")
 
@@ -399,18 +419,12 @@ class ApiSnapshotMixin:
             return inventory
 
         if status in SNAPSHOT_ENDPOINT_UNAVAILABLE_HTTP_STATUSES:
-            self._set_snapshot_capability(
-                "_snapshot_inventory_supported",
-                "_snapshot_inventory_supported_by_type",
-                target_type,
-                False,
-            )
             raise UnsupportedFeature(
                 "Snapshot inventory endpoint is not available on this system."
             )
-        raise UnsupportedFeature(
+        raise CannotConnect(
             f"Snapshot inventory endpoint returned HTTP {status}: "
-            f"{safe_error_text(payload)}"
+            f"{safe_response_summary(payload)}"
         )
 
     async def _async_create_snapshot_once(
@@ -436,18 +450,12 @@ class ApiSnapshotMixin:
             return
 
         if status in SNAPSHOT_ENDPOINT_UNAVAILABLE_HTTP_STATUSES:
-            self._set_snapshot_capability(
-                "_snapshot_create_supported",
-                "_snapshot_create_supported_by_type",
-                target_type,
-                False,
-            )
             raise UnsupportedFeature(
                 "Manual snapshot endpoint is not available on this system."
             )
-        raise UnsupportedFeature(
+        raise CannotConnect(
             f"Manual snapshot endpoint returned HTTP {status}: "
-            f"{safe_error_text(response_payload)}"
+            f"{safe_response_summary(response_payload)}"
         )
 
     async def _async_update_snapshot_target_settings_once(
@@ -493,12 +501,7 @@ class ApiSnapshotMixin:
         if delete_settings:
             write_attempts.insert(0, ("DELETE", None))
 
-        last_status: int | None = None
-        last_payload: Any = None
-        last_method = write_attempts[0][0]
         for method, body in write_attempts:
-            last_method = method
-            unsupported = True
             for path in _snapshot_settings_write_paths(target):
                 write_status, write_response = await self._request_raw(
                     method,
@@ -514,29 +517,23 @@ class ApiSnapshotMixin:
                     )
                     return
 
-                last_status = write_status
-                last_payload = write_response
                 if write_status not in SNAPSHOT_ENDPOINT_UNAVAILABLE_HTTP_STATUSES:
-                    unsupported = False
-
-            if unsupported:
-                if method == "PUT":
-                    self._set_snapshot_capability(
-                        "_snapshot_settings_write_supported",
-                        "_snapshot_settings_write_supported_by_type",
-                        target_type,
-                        False,
+                    # The write may have succeeded before the error response.
+                    raise CannotConnect(
+                        f"Snapshot settings {method.lower()} endpoint returned HTTP "
+                        f"{write_status}: {safe_response_summary(write_response)}"
                     )
-                    raise UnsupportedFeature(
-                        "Snapshot settings write endpoint is not available on this system."
-                    )
-                continue
-            break
 
-        raise UnsupportedFeature(
-            f"Snapshot settings {last_method.lower()} endpoint returned HTTP "
-            f"{last_status}: {safe_error_text(last_payload)}"
-        )
+            if method == "PUT":
+                self._set_snapshot_capability(
+                    "_snapshot_settings_write_supported",
+                    "_snapshot_settings_write_supported_by_type",
+                    target_type,
+                    False,
+                )
+                raise UnsupportedFeature(
+                    "Snapshot settings write endpoint is not available on this system."
+                )
 
     def _current_user_id(self) -> str | None:
         """Return the authenticated user id when login metadata exposes it."""

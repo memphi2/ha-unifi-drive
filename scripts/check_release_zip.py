@@ -12,14 +12,14 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from check_repo import (  # noqa: E402
+from repo_hygiene import (  # noqa: E402
     BRANDING_CLAIM_PATTERNS,
     GENERATED_ARTIFACT_PATH_PATTERNS,
     OFFICIAL_VENDOR_ASSET_PATH_PATTERNS,
     PROPRIETARY_VENDOR_CONTENT_PATTERNS,
     SECRET_PATH_PATTERNS,
-    SECRET_PATTERNS,
     _path_matches_any,
+    content_scan_issues,
     fail,
     local_identifier_issues,
     ok,
@@ -30,6 +30,7 @@ EXPECTED_ROOT = "unifi_unas/"
 REQUIRED_MEMBERS = (
     "unifi_unas/__init__.py",
     "unifi_unas/manifest.json",
+    "unifi_unas/LICENSE",
 )
 
 
@@ -48,9 +49,9 @@ def _release_zip_issues(zip_path: Path) -> list[str]:
     """Return release ZIP privacy, legal and layout issues."""
     issues: list[str] = []
     if not zip_path.exists():
-        return [f"missing release ZIP: {zip_path}"]
+        return ["missing release ZIP"]
     if zip_path.is_dir():
-        return [f"release ZIP path is a directory: {zip_path}"]
+        return ["release ZIP path is a directory"]
 
     try:
         with ZipFile(zip_path) as archive:
@@ -70,24 +71,24 @@ def _release_zip_issues(zip_path: Path) -> list[str]:
                     continue
 
                 if _has_unsafe_member_path(member):
-                    issues.append(f"unsafe ZIP member path: {member}")
+                    issues.append("unsafe ZIP member path")
                     continue
 
                 if not member.startswith(EXPECTED_ROOT):
-                    issues.append(f"unexpected member outside {EXPECTED_ROOT}: {member}")
+                    issues.append(f"unexpected member outside {EXPECTED_ROOT}")
                     continue
 
                 if member.endswith("/"):
                     continue
 
                 if _path_matches_any(member, SECRET_PATH_PATTERNS):
-                    issues.append(f"secret-like path in release ZIP: {member}")
+                    issues.append("secret-like path in release ZIP")
                     continue
                 if _path_matches_any(member, GENERATED_ARTIFACT_PATH_PATTERNS):
-                    issues.append(f"generated artifact in release ZIP: {member}")
+                    issues.append("generated artifact in release ZIP")
                     continue
                 if _path_matches_any(member, OFFICIAL_VENDOR_ASSET_PATH_PATTERNS):
-                    issues.append(f"official/vendor asset path in release ZIP: {member}")
+                    issues.append("official/vendor asset path in release ZIP")
                     continue
                 local_path_issues = local_identifier_issues(
                     "release ZIP member path",
@@ -98,13 +99,14 @@ def _release_zip_issues(zip_path: Path) -> list[str]:
                     continue
 
                 data = archive.read(info)
+                if member == "unifi_unas/LICENSE" and data != (
+                    SCRIPTS_DIR.parent / "LICENSE"
+                ).read_bytes():
+                    issues.append("release LICENSE differs from the repository license")
                 if b"\0" in data[:4096]:
                     continue
 
-                for label, pattern in SECRET_PATTERNS:
-                    if pattern.search(data):
-                        issues.append(f"{member}: possible {label}")
-                        break
+                issues.extend(content_scan_issues(member, data))
 
                 for label, pattern in PROPRIETARY_VENDOR_CONTENT_PATTERNS:
                     if pattern.search(data):
@@ -118,7 +120,7 @@ def _release_zip_issues(zip_path: Path) -> list[str]:
                         issues.append(f"{member}: possible {label}")
                         break
     except BadZipFile:
-        return [f"invalid ZIP file: {zip_path}"]
+        return ["invalid ZIP file"]
 
     return issues
 

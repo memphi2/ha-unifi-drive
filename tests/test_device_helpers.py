@@ -1,10 +1,13 @@
 """Unit tests for Home Assistant device metadata helpers."""
 
+from dataclasses import dataclass
 from enum import Enum
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 import sys
 import types
+
+import pytest
 
 
 def _load_device_module():
@@ -92,6 +95,69 @@ class _FakeCoordinator:
 
 class _FakeEntry:
     title = "Keller"
+
+
+_UNDEFINED = object()
+
+
+@dataclass(kw_only=True, slots=True)
+class _AttributeDeviceInfo:
+    """Model the new attribute API without allowing compatibility methods."""
+
+    identifiers: object = _UNDEFINED
+    name: object = _UNDEFINED
+    manufacturer: object = _UNDEFINED
+    model: object = _UNDEFINED
+    sw_version: object = _UNDEFINED
+    configuration_url: object = _UNDEFINED
+
+    def get(self, *args: object) -> object:
+        raise AssertionError("Modern DeviceInfo must not use the dict compatibility API")
+
+
+@pytest.mark.parametrize("factory", (dict, _AttributeDeviceInfo))
+def test_device_registry_metadata_extracts_only_registry_text(factory) -> None:
+    """Only the four synchronized text fields belong in registry updates."""
+    expected = {
+        "manufacturer": "Ubiquiti",
+        "model": "UNAS2",
+        "sw_version": "5.1.10",
+        "configuration_url": "https://unas.example",
+    }
+    info = factory(**expected, identifiers={("unifi_unas", "device-1")}, name="UNAS")
+
+    assert device_module.device_registry_metadata(info) == expected
+
+
+@pytest.mark.parametrize("factory", (dict, _AttributeDeviceInfo))
+def test_device_registry_metadata_skips_missing_fields(factory) -> None:
+    """Missing keys and unset dataclass attributes must not clear cached values."""
+    info = factory(model="UNAS2")
+
+    assert device_module.device_registry_metadata(info) == {"model": "UNAS2"}
+
+
+@pytest.mark.parametrize("factory", (dict, _AttributeDeviceInfo))
+@pytest.mark.parametrize("value", (None, "", _UNDEFINED))
+def test_device_registry_metadata_skips_empty_and_undefined_text(factory, value) -> None:
+    """Never pass empty values or HA's truthy unset sentinel to the registry."""
+    info = factory(
+        manufacturer=value, model=value, sw_version=value, configuration_url=value
+    )
+
+    assert device_module.device_registry_metadata(info) == {}
+
+
+def test_build_device_info_supports_attribute_constructor(monkeypatch) -> None:
+    """The existing builder must also work with keyword-only dataclasses."""
+    monkeypatch.setattr(device_module, "DeviceInfo", _AttributeDeviceInfo)
+
+    info = device_module.build_device_info(_FakeCoordinator(), _FakeEntry(), "device-1")
+
+    assert info.identifiers == {("unifi_unas", "device-1")}
+    assert info.model == "UNAS2"
+    assert info.sw_version == "5.0.17"
+    assert device_module.device_registry_metadata(info)["sw_version"] == "5.0.17"
 
 
 def test_device_info_uses_dynamic_model_and_firmware_version() -> None:

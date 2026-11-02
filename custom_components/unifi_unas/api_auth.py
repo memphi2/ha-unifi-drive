@@ -9,8 +9,9 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from aiohttp import ClientResponse, ClientSession
 
 from .api_errors import CannotConnect, InvalidAuth
+from .api_transport import reject_redirect
 from .const import LOGIN_PATH
-from .security import safe_error_text
+from .security import safe_response_summary
 from .wake_on_lan import normalize_mac_address
 
 # Cookie name only, not a secret value.
@@ -225,8 +226,10 @@ class ApiAuthMixin:
                 json=payload,
                 headers=self._headers(),
                 ssl=self._ssl,
+                allow_redirects=False,
             )
             async with response:
+                reject_redirect(response)
                 return await self._consume_login_response(response)
 
         data = await self._request_with_timeout(_execute_login)
@@ -245,7 +248,9 @@ class ApiAuthMixin:
     async def _prime_csrf_token(self) -> None:
         """Fetch the console root once to pick up a CSRF token when provided."""
         async def _read_root() -> None:
-            response = await self._session.get(self.base_url, ssl=self._ssl)
+            response = await self._session.get(
+                self.base_url, ssl=self._ssl, allow_redirects=False
+            )
             async with response:
                 self._update_csrf_token(response)
                 await response.read()
@@ -266,7 +271,7 @@ class ApiAuthMixin:
         if response.status >= 400:
             body = await response.text()
             raise CannotConnect(
-                f"Login failed with HTTP {response.status}: {safe_error_text(body)}"
+                f"Login failed with HTTP {response.status}: {safe_response_summary(body)}"
             )
 
         try:

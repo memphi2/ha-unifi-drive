@@ -344,9 +344,12 @@ def _pool_key(pool: dict[str, Any], index: int) -> str:
 def _pool_from_key(
     data: dict[str, Any] | None,
     key: str,
+    *,
+    pools: list[dict[str, Any]] | None = None,
 ) -> tuple[dict[str, Any] | None, int | None]:
     """Return pool and index for a pool key, including legacy key formats."""
-    pools = _pools(data)
+    if pools is None:
+        pools = _pools(data)
     for index, pool in enumerate(pools):
         if _pool_key(pool, index) == key:
             return pool, index

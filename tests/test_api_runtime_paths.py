@@ -10,6 +10,7 @@ import pytest
 from tests.api_client_stubs import UnifiUnasApiClient
 
 from custom_components.unifi_unas import api_transport as api_transport_module
+from custom_components.unifi_unas import api_storage as api_storage_module
 from custom_components.unifi_unas.api import (
     CannotConnect,
     InvalidAuth,
@@ -197,6 +198,21 @@ def test_transport_raw_response_parses_json_text_and_empty_bodies() -> None:
     assert asyncio.run(client._request_raw("POST", "/three")) == (204, None)
 
 
+@pytest.mark.parametrize("body", [
+    '{"username":"private-user","share":"private-share"}',
+    "Request from private-console for private-user on private-share failed",
+    "<html><title>private-console</title>private-share</html>",
+])
+def test_transport_errors_never_include_untrusted_body_values(body: str) -> None:
+    """Regex redaction is not a safe boundary for arbitrary device error text."""
+    session = _Session()
+    session.request_responses.append(_Response(503, text=body))
+    with pytest.raises(CannotConnect) as error:
+        asyncio.run(_client(session)._request_json("GET", "/private-share"))
+    assert "HTTP 503" in str(error.value)
+    assert "private-" not in str(error.value)
+
+
 def test_transport_timeout_wrapper_sanitizes_aiohttp_errors() -> None:
     """Aiohttp client errors should be mapped without raw endpoint details."""
     client = _client(_Session())
@@ -352,6 +368,41 @@ def test_storage_read_tolerates_missing_system_metadata() -> None:
 
     assert data == {"storage": True}
     assert client._system_info is None
+
+
+@pytest.mark.parametrize("slow_paths", [
+    {"/api/system"}, {NETWORK_IO_PATH}, {"/api/system", NETWORK_IO_PATH},
+])
+def test_metadata_timeouts_do_not_delay_other_endpoints_and_recover(monkeypatch, slow_paths):
+    """A healthy storage read survives each stalled metadata endpoint."""
+    monkeypatch.setattr(api_storage_module, "_METADATA_REQUEST_TIMEOUT", 0.01)
+    client = _client(_Session())
+    client._authenticated = True
+    calls = []
+    slow = True
+
+    async def request(method, path):
+        calls.append(path)
+        if slow and path in slow_paths:
+            await asyncio.Event().wait()
+        if path.endswith("/storage"):
+            return {"storage": True}
+        return {"example": True}
+
+    client._request_json = request
+
+    async def exercise():
+        nonlocal slow
+        data = await asyncio.wait_for(client.async_get_storage(), timeout=1)
+        assert data["storage"] is True
+        assert ("_system" in data) == ("/api/system" not in slow_paths)
+        assert ("_network_io" in data) == (NETWORK_IO_PATH not in slow_paths)
+        assert calls[-2:] == ["/api/system", NETWORK_IO_PATH]
+        slow = False
+        recovered = await client.async_get_storage()
+        assert recovered["_system"] == recovered["_network_io"] == {"example": True}
+
+    asyncio.run(exercise())
 
 
 def test_system_power_actions_check_permission_and_retry_auth() -> None:

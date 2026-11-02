@@ -1,0 +1,5 @@
+# Direct CI tools only; no generated freeze, HA constraints or test-helper pins.
+# Keep compatible with both Python versions in the validation matrix.
+bandit==1.9.4
+mypy==2.4.1
+ruff==0.17.3

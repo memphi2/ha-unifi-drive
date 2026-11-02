@@ -143,6 +143,8 @@ def _update_snapshot_target_missing_state(
     entry: UnifiDriveConfigEntry,
 ) -> None:
     """Track snapshot targets that disappeared without deleting their entities."""
+    if not getattr(coordinator, "snapshot_settings_available", True):
+        return
     current_targets = tuple(
         target
         for target in getattr(coordinator, "snapshot_settings", ())
@@ -213,6 +215,8 @@ class UnifiUnasSnapshotTargetEntity(
 
     _attr_has_entity_name = True
     _attr_entity_category = EntityCategory.CONFIG
+    # Inventory owns count history; controls still expose live counts to cards.
+    _unrecorded_attributes = frozenset({"total_count", "locked_count"})
 
     def __init__(
         self,
@@ -221,7 +225,6 @@ class UnifiUnasSnapshotTargetEntity(
         target: Mapping[str, Any],
         *,
         entity_key: str,
-        name_suffix: str,
         icon: str | None = None,
     ) -> None:
         """Initialize the snapshot target entity."""
@@ -232,7 +235,7 @@ class UnifiUnasSnapshotTargetEntity(
         self._target_name = snapshot_target_name(target)
         self._target_type = snapshot_target_type(target)
         self._snapshot_target_missing_count = 0
-        self._attr_name = f"{self._target_name} {name_suffix}"
+        self._attr_translation_placeholders = {"target_name": self._target_name}
         self._attr_translation_key = f"snapshot_{entity_key}"
         self._attr_unique_id = (
             f"{self._device_identifier}_snapshot_{snapshot_target_slug(self._target_key)}"
@@ -250,6 +253,7 @@ class UnifiUnasSnapshotTargetEntity(
         return (
             bool(super().available)
             and self.coordinator.is_device_online
+            and getattr(self.coordinator, "snapshot_settings_available", True)
             and self._current_target() is not None
         )
 

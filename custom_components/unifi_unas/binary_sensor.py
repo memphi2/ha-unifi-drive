@@ -18,10 +18,10 @@ from .binary_sensor_descriptions import (
 from .coordinator import UnifiUnasCoordinator
 from .entity_base import UnifiUnasDeviceInfoMixin
 from .runtime import UnifiDriveConfigEntry, coordinator_from_entry
+from .storage_view import storage_view
 from .storage_helpers import (
     _aggregate_status,
     _at_risk_disk_count,
-    _pool_from_key,
     _pool_in_maintenance,
     _pool_key,
     _pool_name,
@@ -54,7 +54,7 @@ async def async_setup_entry(
     def _add_missing_pool_binary_sensors() -> None:
         """Create pool binary sensors when pool data becomes available."""
         new_entities: list[BinarySensorEntity] = []
-        for index, pool in enumerate(_pools(coordinator.data)):
+        for index, pool in enumerate(storage_view(coordinator).pools):
             pool_key = _pool_key(pool, index)
             if pool_key in known_pool_keys:
                 continue
@@ -159,6 +159,7 @@ class UnifiUnasAggregateBinarySensor(UnifiUnasBaseBinarySensor):
 class UnifiUnasPoolBinarySensor(UnifiUnasBaseBinarySensor):
     """Per-pool UNAS binary sensor."""
 
+    _unrecorded_attributes = frozenset({"rebuild_progress", "sync_progress"})
     entity_description: PoolBinarySensorDescription
 
     def __init__(
@@ -174,8 +175,7 @@ class UnifiUnasPoolBinarySensor(UnifiUnasBaseBinarySensor):
         self.entity_description = description
         self._pool_key = pool_key
         self._pool_name = pool_name
-        suffix = description.name or description.key
-        self._attr_name = f"{pool_name} {suffix}"
+        self._attr_translation_placeholders = {"pool_name": pool_name}
         self._attr_unique_id = (
             f"{self._device_identifier}_{self._pool_key}_{description.key}"
         )
@@ -210,5 +210,4 @@ class UnifiUnasPoolBinarySensor(UnifiUnasBaseBinarySensor):
 
     def _pool(self) -> dict[str, Any] | None:
         """Return the currently matching pool by key."""
-        pool, _ = _pool_from_key(self.coordinator.data, self._pool_key)
-        return pool
+        return storage_view(self.coordinator).pool(self._pool_key)

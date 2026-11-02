@@ -203,7 +203,6 @@ class UnifiUnasSnapshotScheduleSelect(
             entry,
             target,
             entity_key="schedule",
-            name_suffix="Snapshot Schedule",
         )
 
     @property
@@ -248,7 +247,6 @@ class UnifiUnasSnapshotWeekdaySelect(
             entry,
             target,
             entity_key="weekday",
-            name_suffix="Snapshot Weekday",
         )
 
     @property

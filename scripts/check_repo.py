@@ -4,16 +4,26 @@
 from __future__ import annotations
 
 import configparser
-import ipaddress
 import json
-import os
 import re
 # This script only uses fixed argv lists.
 import subprocess  # nosec B404
 import shutil
 import sys
 from pathlib import Path
+from string import Formatter
 from typing import Any
+
+SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+from repo_hygiene import (  # noqa: E402
+    FORBIDDEN_MARKERS_ENV as FORBIDDEN_MARKERS_ENV,
+    _tracked_file_hygiene_issues,
+    fail,
+    ok,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,6 +36,7 @@ RELEASE_NOTES_DIR = ROOT / ".github" / "release-notes"
 LICENSE_PATH = ROOT / "LICENSE"
 LEGAL_PATH = ROOT / "docs" / "legal.md"
 LTS_PATH = ROOT / "docs" / "lts.md"
+INSTALLATION_PATH = ROOT / "docs" / "installation.md"
 STRINGS_PATH = INTEGRATION_DIR / "strings.json"
 ICONS_PATH = INTEGRATION_DIR / "icons.json"
 TRANSLATION_DIR = INTEGRATION_DIR / "translations"
@@ -39,6 +50,7 @@ VALIDATE_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "validate.yml"
 RELEASE_WORKFLOW_PATH = ROOT / ".github" / "workflows" / "release.yml"
 RELEASE_ZIP_CHECK_PATH = ROOT / "scripts" / "check_release_zip.py"
 GITHUB_SURFACE_AUDIT_PATH = ROOT / "scripts" / "audit_github_public_surfaces.py"
+CI_TOOL_REQUIREMENTS_PATH = ROOT / "requirements" / "ci" / "requirements.txt"
 
 QUALITY_RULES_BY_TIER = {
     "bronze": (
@@ -50,6 +62,8 @@ QUALITY_RULES_BY_TIER = {
         "config-flow",
         "dependency-transparency",
         "docs-actions",
+        "docs-conditions",
+        "docs-triggers",
         "docs-high-level-description",
         "docs-installation-instructions",
         "docs-removal-instructions",
@@ -174,8 +188,8 @@ VALIDATE_WORKFLOW_HA_REQUIREMENT_PATTERN = re.compile(
 VALIDATE_WORKFLOW_PYTHON_PATTERN = re.compile(r"python:\s*[\"']?3\.14[\"']?")
 VALIDATE_WORKFLOW_MINIMUM_PYTHON_PATTERN = re.compile(r"python:\s*[\"']?3\.12[\"']?")
 RELEASE_WORKFLOW_PYTHON_PATTERN = re.compile(r"python-version:\s*[\"']?3\.14[\"']?")
-CURRENT_HOMEASSISTANT_TARGET = "2026.10.0"
-CURRENT_PYTEST_HOMEASSISTANT = "0.13.371"
+CURRENT_HOMEASSISTANT_TARGET = "2026.10.4"
+CURRENT_PYTEST_HOMEASSISTANT = "0.13.375"
 WORKFLOW_HOMEASSISTANT_MATRIX_PATTERN = re.compile(
     r"homeassistant:\s*[\"']([^\"']+)[\"']"
 )
@@ -185,6 +199,7 @@ CONFIG_FLOW_RELOAD_METHOD_PATTERNS = {
     "async_update_reload_and_abort": re.compile(r"\basync_update_reload_and_abort\("),
 }
 DEPRECATED_HOMEASSISTANT_API_PATTERNS = {
+    "RestoreStateData.last_states": re.compile(r"\.last_states\b"),
     "DeviceEntry.primary_config_entry": re.compile(r"\bprimary_config_entry\b"),
     "DeviceEntry.config_entries_subentries": re.compile(
         r"\bconfig_entries_subentries\b"
@@ -213,7 +228,7 @@ LEGAL_DOC_MARKERS = (
     "observed interoperability behavior only",
 )
 README_BRONZE_DOC_MARKERS = (
-    "## Current Maturity",
+    "## Maturity And Roadmap",
     "## Installation",
     "## Removal",
     "## Services",
@@ -224,12 +239,27 @@ README_BRONZE_DOC_MARKERS = (
 README_HIGHER_QUALITY_DOC_MARKERS = (
     "## Supported Devices",
     "## Data Updates",
-    "## Use Cases And Automation Examples",
-    "## Silver Gold Platinum Roadmap",
+    "## Automation Examples",
+    "(custom_components/unifi_unas/quality_scale.yaml)",
+)
+MARKETPLACE_README_MARKERS = (
+    "### Home Assistant Marketplace",
+    "### HACS",
+    "## Updates",
+    "(docs/installation.md)",
+)
+INSTALLATION_DOC_MARKERS = (
+    "## Home Assistant Marketplace",
+    "## Home Assistant Before 2026.11",
+    "## Existing Installations",
+    "## Updates",
+    "## Upgrading From Before 0.8.0",
+    "## Removal",
+    "/config/custom_components/unifi_unas/",
 )
 
 MOJIBAKE_MARKERS = ("\u00c3", "\u00c2", "\u00e2\u20ac", "\ufffd")
-TEXT_GLOBS = ("*.md", "*.json", "*.py", "*.yml", "*.yaml", "*.ini", "*.example")
+TEXT_GLOBS = ("*.md", "*.json", "*.py", "*.yml", "*.yaml", "*.ini", "*.example", "*.txt")
 IGNORED_DIRS = {
     ".git",
     ".mypy_cache",
@@ -241,199 +271,6 @@ IGNORED_DIRS = {
     "__pycache__",
     "node_modules",
 }
-FORBIDDEN_MARKERS_ENV = "UNIFI_UNAS_FORBIDDEN_MARKERS"
-SECRET_PATTERNS = (
-    (
-        "private key",
-        re.compile(rb"-----BEGIN (?:RSA |OPENSSH |EC |DSA )?PRIVATE KEY-----"),
-    ),
-    ("github token", re.compile(rb"\bgh[opsu]_[A-Za-z0-9_]{36,}\b")),
-    (
-        "literal HA smoke password",
-        re.compile(
-            rb"HA_(?:SMOKE|TEST)_PASSWORD\s*=\s*['\"][^'\"\r\n]{8,}['\"]"
-        ),
-    ),
-    (
-        "plain password assignment",
-        re.compile(
-            rb"(?i)\b\"?(?:password|passwd|cifs_password)\"?\s*[:=]\s*['\"]?"
-            rb"(?!(?:<redacted>|redacted|secret[-_]?password|stored-password|"
-            rb"changed-pass|new-pass|test-pass|password|pass|abc)\b)"
-            rb"(?:(?:[^\s'\"\r\n]{12,}['\"])|"
-            rb"(?=[^\s'\"\r\n]*\d)"
-            rb"(?=[^\s'\"\r\n]*[!#$%&()*+,/:;<=>?@\[\]^_`{|}~-])"
-            rb"[^\s'\"\r\n.]{12,})"
-        ),
-    ),
-    (
-        "JSON access token",
-        re.compile(
-            rb'"(?:access_token|refresh_token)"\s*:\s*"'
-            rb'[A-Za-z0-9._~+/=-]{20,}"'
-        ),
-    ),
-    (
-        "JWT-like token",
-        re.compile(
-            rb"\beyJ[A-Za-z0-9_-]{10,}\."
-            rb"[A-Za-z0-9_-]{10,}\."
-            rb"[A-Za-z0-9_-]{8,}\b"
-        ),
-    ),
-    ("UniFi token cookie", re.compile(rb"\bTOKEN=[A-Za-z0-9._~+/=-]{20,}\b")),
-)
-SECRET_PATH_PATTERNS = (
-    re.compile(r"(^|/)\.storage(?:/|$)"),
-    re.compile(r"(^|/)home-assistant_v2\.db(?:-(?:wal|shm))?$"),
-    re.compile(r"(^|/)ha_frontend_smoke\.env$"),
-    re.compile(r"(^|/)\.env$"),
-)
-GENERATED_ARTIFACT_PATH_PATTERNS = (
-    re.compile(r"(^|/)__pycache__/"),
-    re.compile(r"\.py[co]$"),
-    re.compile(r"(^|/)\.coverage$"),
-    re.compile(r"(^|/)coverage\.xml$"),
-    re.compile(r"(^|/)htmlcov(?:/|$)"),
-    re.compile(r"(^|/)\.(?:mypy|pytest|ruff)_cache(?:/|$)"),
-)
-OFFICIAL_VENDOR_ASSET_PATH_PATTERNS = (
-    re.compile(
-        r"(^|/)(?:ubiquiti|unifi)[_-]?(?:logo|brand|mark|icon)[^/]*"
-        r"\.(?:png|svg|jpg|jpeg|webp)$",
-        re.IGNORECASE,
-    ),
-    re.compile(
-        r"(^|/)(?:ubiquiti|unifi)/.*\.(?:png|svg|jpg|jpeg|webp)$",
-        re.IGNORECASE,
-    ),
-    re.compile(
-        r"(^|/)(?:official|vendor)[_-]?(?:ubiquiti|unifi|ui)?[_-]?"
-        r"(?:logo|brand|mark|icon)[^/]*\.(?:png|svg|jpg|jpeg|webp)$",
-        re.IGNORECASE,
-    ),
-    re.compile(
-        r"(^|/)(?:unifi|ubiquiti)[^/]*\.(?:js|css|map|html)$",
-        re.IGNORECASE,
-    ),
-    re.compile(
-        r"(^|/)(?:unifi|ubiquiti)/.*\.(?:js|css|map|html)$",
-        re.IGNORECASE,
-    ),
-)
-_COPY = b"Copy" + b"right"
-_UI = b"Ubi" + b"quiti"
-_ALL_RESERVED = b"All rights " + b"reserved"
-_LICENSED_PROP = b"licensed " + b"proprietary"
-_PROP_CONFIDENTIAL = b"proprietary " + b"and confidential"
-_UNAUTHORIZED = b"unauthorized " + b"use"
-_IPV4_LITERAL_PATTERN = re.compile(rb"\b(?:\d{1,3}\.){3}\d{1,3}\b")
-PROPRIETARY_VENDOR_CONTENT_PATTERNS = (
-    (
-        "Ubiquiti copyright header",
-        re.compile(rb"(?:" + _COPY + rb"|\(c\)|\xc2\xa9).{0,80}" + _UI, re.I | re.S),
-    ),
-    (
-        "Ubiquiti all-rights-reserved marker",
-        re.compile(_UI + rb" Inc\.?.{0,80}" + _ALL_RESERVED, re.I | re.S),
-    ),
-    (
-        "proprietary license marker",
-        re.compile(rb"(?:" + _LICENSED_PROP + rb"|" + _PROP_CONFIDENTIAL + rb")", re.I),
-    ),
-    (
-        "vendor redistribution prohibition",
-        re.compile(
-            _UNAUTHORIZED + rb".{0,80}(?:duplication|distribution)",
-            re.I | re.S,
-        ),
-    ),
-)
-BRANDING_CLAIM_PATTERNS = (
-    (
-        "official vendor integration claim",
-        re.compile(
-            rb"\bofficial\s+(?:Ubiquiti|UniFi|UI)\s+"
-            rb"(?:integration|app|add-?on|project|repository)\b",
-            re.I,
-        ),
-    ),
-    (
-        "vendor endorsement claim",
-        re.compile(
-            rb"\b(?:certified|endorsed|approved)\s+by\s+"
-            rb"(?:Ubiquiti|UniFi|UI)\b",
-            re.I,
-        ),
-    ),
-    (
-        "vendor-owned project claim",
-        re.compile(
-            rb"\b(?:Ubiquiti|UniFi|UI)\s+"
-            rb"(?:official|certified|endorsed|approved)\b",
-            re.I,
-        ),
-    ),
-)
-
-
-def _configured_local_marker_patterns() -> tuple[re.Pattern[bytes], ...]:
-    """Return optional local marker denylist patterns from environment."""
-    raw = os.environ.get(FORBIDDEN_MARKERS_ENV, "")
-    markers = [
-        marker.strip()
-        for marker in re.split(r"[\n,]", raw)
-        if len(marker.strip()) >= 3
-    ]
-    return tuple(
-        re.compile(
-            rb"(?<![A-Za-z0-9])"
-            + re.escape(marker.encode("utf-8"))
-            + rb"(?![A-Za-z0-9])",
-            re.I,
-        )
-        for marker in markers
-    )
-
-
-def _is_rfc1918_ipv4(value: bytes) -> bool:
-    """Return whether an IPv4 literal is from RFC1918 private space."""
-    try:
-        address = ipaddress.IPv4Address(value.decode("ascii"))
-    except ValueError:
-        return False
-
-    address_int = int(address)
-    first = address_int >> 24
-    second = (address_int >> 16) & 0xFF
-    return (
-        first == 0x0A
-        or (first == 0xAC and 0x10 <= second <= 0x1F)
-        or (first == 0xC0 and second == 0xA8)
-    )
-
-
-def local_identifier_issues(label: str, data: bytes) -> list[str]:
-    """Return generic local identity findings without exposing raw values."""
-    issues: list[str] = []
-    if any(_is_rfc1918_ipv4(match.group(0)) for match in _IPV4_LITERAL_PATTERN.finditer(data)):
-        issues.append(f"{label}: possible private local IPv4 address")
-
-    if any(pattern.search(data) for pattern in _configured_local_marker_patterns()):
-        issues.append(f"{label}: possible configured local identifier marker")
-
-    return issues
-
-
-def fail(message: str) -> None:
-    """Print failure message and exit."""
-    print(f"[FAIL] {message}")
-    raise SystemExit(1)
-
-
-def ok(message: str) -> None:
-    """Print success message."""
-    print(f"[OK] {message}")
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -505,6 +342,9 @@ def _missing_text_markers(text: str, markers: tuple[str, ...]) -> list[str]:
 
 def check_legal_docs() -> None:
     """Validate legal/disclaimer text and asset-hygiene documentation."""
+    component_license = INTEGRATION_DIR / "LICENSE"
+    if not component_license.is_file() or component_license.read_bytes() != LICENSE_PATH.read_bytes():
+        fail("The integration must include an unchanged copy of the root LICENSE")
     readme = README_PATH.read_text(encoding="utf-8")
     legal = LEGAL_PATH.read_text(encoding="utf-8")
 
@@ -529,6 +369,18 @@ def check_bronze_docs() -> None:
     ok("Quality-scale documentation sections validated")
 
 
+def check_marketplace_docs() -> None:
+    """Keep current and legacy installation paths documented together."""
+    for path, markers in (
+        (README_PATH, MARKETPLACE_README_MARKERS),
+        (INSTALLATION_PATH, INSTALLATION_DOC_MARKERS),
+    ):
+        missing = _missing_text_markers(path.read_text(encoding="utf-8"), markers)
+        if missing:
+            fail(f"{path.name} missing Marketplace documentation markers: {missing}")
+    ok("Marketplace and legacy installation documentation validated")
+
+
 def _tracked_file_paths() -> list[str]:
     """Return tracked paths from git."""
     git_bin = shutil.which("git")
@@ -548,64 +400,6 @@ def _tracked_file_paths() -> list[str]:
         print(proc.stderr)
         fail("Could not list tracked files")
     return [path for path in proc.stdout.split("\0") if path]
-
-
-def _path_matches_any(path: str, patterns: tuple[re.Pattern[str], ...]) -> bool:
-    """Return whether a normalized path matches any pattern."""
-    return any(pattern.search(path) for pattern in patterns)
-
-
-def _tracked_file_hygiene_issues(root: Path, tracked_paths: list[str]) -> list[str]:
-    """Return legal, secret and artifact issues in tracked files."""
-    failures: list[str] = []
-
-    for relative in tracked_paths:
-        normalized = relative.replace("\\", "/")
-        if _path_matches_any(normalized, SECRET_PATH_PATTERNS):
-            failures.append(f"tracked secret-like path: {relative}")
-            continue
-        if _path_matches_any(normalized, GENERATED_ARTIFACT_PATH_PATTERNS):
-            failures.append(f"tracked generated artifact path: {relative}")
-            continue
-        if _path_matches_any(normalized, OFFICIAL_VENDOR_ASSET_PATH_PATTERNS):
-            failures.append(f"tracked official/vendor asset path: {relative}")
-            continue
-        local_path_issues = local_identifier_issues(
-            "tracked path",
-            normalized.encode("utf-8", errors="ignore"),
-        )
-        if local_path_issues:
-            failures.extend(local_path_issues)
-            continue
-
-        path = root / relative
-        try:
-            data = path.read_bytes()
-        except OSError as err:
-            failures.append(f"could not read tracked file {relative}: {err}")
-            continue
-
-        if b"\0" in data[:4096]:
-            continue
-
-        for label, pattern in SECRET_PATTERNS:
-            if pattern.search(data):
-                failures.append(f"{relative}: possible {label}")
-                break
-
-        for label, pattern in PROPRIETARY_VENDOR_CONTENT_PATTERNS:
-            if pattern.search(data):
-                failures.append(f"{relative}: possible {label}")
-                break
-
-        failures.extend(local_identifier_issues(relative, data))
-
-        for label, pattern in BRANDING_CLAIM_PATTERNS:
-            if pattern.search(data):
-                failures.append(f"{relative}: possible {label}")
-                break
-
-    return failures
 
 
 def check_tracked_file_hygiene() -> None:
@@ -640,6 +434,8 @@ def check_manifest() -> None:
         fail("manifest config_flow must be true")
     if manifest["integration_type"] != "device":
         fail("manifest integration_type must be 'device'")
+    if manifest.get("categories") != ["computers_network.nas_servers"]:
+        fail("manifest categories must identify UNAS as computers_network.nas_servers")
     if not isinstance(manifest.get("requirements"), list):
         fail("manifest requirements must be a list")
     if not manifest.get("codeowners"):
@@ -749,7 +545,30 @@ def check_translations() -> None:
                 f"Translation keys mismatch in {file.name}; "
                 f"missing={missing}, extra={extra}"
             )
+        _check_entity_name_placeholders(strings, translation, file.name)
         ok(f"Translation JSON valid: {file.name}")
+
+
+def _check_entity_name_placeholders(
+    source: dict[str, Any], translation: dict[str, Any], label: str,
+) -> None:
+    """Keep dynamic names translatable without dropping identity placeholders."""
+    formatter = Formatter()
+    for platform, definitions in source.get("entity", {}).items():
+        for key, definition in definitions.items():
+            if "name" not in definition:
+                continue
+            original = definition["name"]
+            translated = translation["entity"][platform][key]["name"]
+            if not isinstance(original, str) or not isinstance(translated, str):
+                fail(f"{label} entity.{platform}.{key}.name must be text")
+            try:
+                expected = {field for _, field, _, _ in formatter.parse(original) if field is not None}
+                actual = {field for _, field, _, _ in formatter.parse(translated) if field is not None}
+            except ValueError:
+                fail(f"{label} entity.{platform}.{key}.name has invalid placeholders")
+            if expected != actual:
+                fail(f"{label} entity.{platform}.{key}.name placeholders differ")
 
 
 def _check_config_step_data_descriptions(
@@ -859,28 +678,19 @@ def check_quality_scale() -> None:
     if invalid_statuses:
         fail(f"quality_scale.yaml has unsupported statuses: {invalid_statuses}")
 
-    required_quality_rules = (
-        QUALITY_RULES_BY_TIER["bronze"]
-        + QUALITY_RULES_BY_TIER["silver"]
-        + QUALITY_RULES_BY_TIER["gold"]
-    )
-    missing = [rule for rule in required_quality_rules if rule not in rules]
-    if missing:
-        fail(f"quality_scale.yaml missing Bronze/Silver/Gold rules: {missing}")
-
-    incomplete = {
-        rule: rules[rule]
-        for rule in required_quality_rules
-        if rules[rule] != "done"
-    }
-    if incomplete:
-        fail(f"Bronze, Silver and Gold quality rules must be done: {incomplete}")
+    text = QUALITY_SCALE_PATH.read_text(encoding="utf-8")
+    for rule, status in rules.items():
+        if status == "done":
+            continue
+        block = re.search(rf"(?m)^  {re.escape(rule)}:\s*\n((?:    .*(?:\n|$))*)", text)
+        if not block or not re.search(r"(?m)^    comment:\s*\S", block.group(1)):
+            fail(f"Quality rule {rule} ({status}) requires an explanatory comment")
 
     ok("quality_scale.yaml quality status validated")
 
 
 def check_coverage_gate() -> None:
-    """Validate that CI enforces the Silver coverage baseline."""
+    """Validate the aggregate coverage floor, independently of HA tier claims."""
     coverage_text = COVERAGE_PATH.read_text(encoding="utf-8")
     workflow_text = VALIDATE_WORKFLOW_PATH.read_text(encoding="utf-8")
 
@@ -1064,10 +874,10 @@ def check_validate_workflow_homeassistant_target() -> None:
         missing.append("Home Assistant package constraints")
     if "pytest-homeassistant-custom-component==${{ matrix.pytest_homeassistant }}" not in workflow_text:
         missing.append('"pytest-homeassistant-custom-component==${{ matrix.pytest_homeassistant }}"')
-    if "pip install --no-deps" not in workflow_text:
-        missing.append("pytest-homeassistant dependency isolation")
-    if 'Requirement(requirement).name == "homeassistant"' not in workflow_text:
-        missing.append("pytest-homeassistant Home Assistant dependency filter")
+    if "--no-deps" in workflow_text or 'Requirement(requirement).name == "homeassistant"' in workflow_text:
+        missing.append("HA/helper dependencies must not be bypassed")
+    if "python -m pip check" not in workflow_text:
+        missing.append("installed dependency consistency check")
     if "josepy<2.0; python_version < '3.13'" not in workflow_text:
         missing.append("Python 3.12 josepy compatibility pin")
     if "md.version(\"homeassistant\")" not in workflow_text:
@@ -1089,6 +899,24 @@ def check_release_workflow_privacy_gates() -> None:
     if missing:
         fail(f"Release workflow missing privacy/layout gates: {missing}")
     ok("Release workflow privacy/layout gates validated")
+
+
+def check_release_validation_gate() -> None:
+    """Keep publication dependent on full validation of the tagged commit."""
+    validate_text = VALIDATE_WORKFLOW_PATH.read_text(encoding="utf-8")
+    release_text = RELEASE_WORKFLOW_PATH.read_text(encoding="utf-8")
+    if "  workflow_call:" not in validate_text:
+        fail("Validate workflow must support workflow_call for release validation")
+    for marker in (
+        "    uses: ./.github/workflows/validate.yml",
+        "    needs: validation",
+        "    if: startsWith(github.ref, 'refs/tags/v')",
+        "Verify release tag matches manifest",
+        'if os.environ["RELEASE_TAG"] != expected:',
+    ):
+        if marker not in release_text:
+            fail(f"Release workflow missing validation gate: {marker}")
+    ok("Release workflow complete-validation and tag gates validated")
 
 
 def _platform_parallel_updates(path: Path) -> int | None:
@@ -1300,6 +1128,7 @@ def main() -> None:
     ensure_file(LICENSE_PATH)
     ensure_file(LEGAL_PATH)
     ensure_file(LTS_PATH)
+    ensure_file(INSTALLATION_PATH)
     ensure_file(MANIFEST_PATH)
     ensure_file(HACS_PATH)
     ensure_file(QUALITY_SCALE_PATH)
@@ -1310,11 +1139,13 @@ def main() -> None:
     ensure_file(RELEASE_WORKFLOW_PATH)
     ensure_file(RELEASE_ZIP_CHECK_PATH)
     ensure_file(GITHUB_SURFACE_AUDIT_PATH)
+    ensure_file(CI_TOOL_REQUIREMENTS_PATH)
 
+    check_tracked_file_hygiene()
     check_all_text_files_for_mojibake()
     check_legal_docs()
     check_bronze_docs()
-    check_tracked_file_hygiene()
+    check_marketplace_docs()
     check_manifest()
     check_entity_name_rule()
     check_hacs()
@@ -1328,6 +1159,7 @@ def main() -> None:
     check_workflow_python_versions()
     check_validate_workflow_homeassistant_target()
     check_release_workflow_privacy_gates()
+    check_release_validation_gate()
     check_parallel_updates_rule()
     check_strict_typing_foundation()
     check_exception_translations()

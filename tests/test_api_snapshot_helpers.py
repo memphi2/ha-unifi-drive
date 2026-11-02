@@ -1165,7 +1165,7 @@ def test_snapshot_create_error_redacts_target_path_and_payload() -> None:
         )
     ]
 
-    with pytest.raises(api_snapshot_module.UnsupportedFeature) as err:
+    with pytest.raises(api_snapshot_module.CannotConnect) as err:
         asyncio.run(client.async_create_snapshot_target(target))
 
     message = str(err.value)
@@ -1183,7 +1183,7 @@ def test_snapshot_inventory_and_write_errors_are_sanitized() -> None:
         (500, {"token": "secret-token", "message": "Authorization: Bearer raw-token"})
     ]
 
-    with pytest.raises(api_snapshot_module.UnsupportedFeature) as err:
+    with pytest.raises(api_snapshot_module.CannotConnect) as err:
         asyncio.run(client._async_get_snapshot_inventory_once("/inventory"))
     assert "secret-token" not in str(err.value)
     assert "raw-token" not in str(err.value)
@@ -1192,7 +1192,7 @@ def test_snapshot_inventory_and_write_errors_are_sanitized() -> None:
     client.responses = [
         (500, {"token": "secret-token", "message": "Authorization: Bearer raw-token"})
     ]
-    with pytest.raises(api_snapshot_module.UnsupportedFeature) as err:
+    with pytest.raises(api_snapshot_module.CannotConnect) as err:
         asyncio.run(
             client._async_update_snapshot_target_settings_once(
                 {"id": "user-1", "type": "mydrive", "user_id": "user-1"},
@@ -1201,6 +1201,26 @@ def test_snapshot_inventory_and_write_errors_are_sanitized() -> None:
         )
     assert "secret-token" not in str(err.value)
     assert "raw-token" not in str(err.value)
+
+
+@pytest.mark.parametrize("status", [400, 409, 429, 500, 503])
+@pytest.mark.parametrize("method", ["POST", "PUT", "DELETE"])
+def test_snapshot_write_never_retries_ambiguous_failure(status, method) -> None:
+    """Only an explicitly absent endpoint permits a second write attempt."""
+    client = SnapshotWriteClient()
+    client.responses = [(status, {}), (200, {})]
+    target = {"id": "shared-id", "type": "shared", "shared_drive_name": "Example"}
+    with pytest.raises(api_snapshot_module.CannotConnect, match=f"HTTP {status}"):
+        if method == "POST":
+            asyncio.run(client.async_create_snapshot_target(target))
+        else:
+            asyncio.run(client._async_update_snapshot_target_settings_once(
+                target, enabled=method != "DELETE",
+            ))
+    assert len(client.calls) == 1
+    assert client.calls[0][0] == method
+    assert client.snapshot_create_supported_by_type == {}
+    assert client.snapshot_settings_write_supported_by_type == {}
 
 
 def test_snapshot_write_uses_update_object_and_respects_cached_unsupported_type() -> None:
@@ -1284,17 +1304,47 @@ def test_snapshot_settings_read_returns_targets_and_current_user() -> None:
     assert client.snapshot_settings_read_supported is True
 
 
-def test_snapshot_settings_read_logs_empty_shapes_and_ignores_server_errors() -> None:
-    """Snapshot settings read should stay quiet and non-fatal for bad payloads."""
+def test_snapshot_settings_read_distinguishes_empty_targets_from_server_errors() -> None:
+    """Server failures must not be mistaken for a successful empty target list."""
     client = SnapshotWriteClient()
     client._snapshot_settings_read_supported = None
     client._login_data = {}
-    client.responses = [(200, {"unexpected": "shape"})]
+    client.responses = [(200, {"data": {"personal": [], "shared": []}})]
     assert asyncio.run(client._async_get_snapshot_settings_once()) == []
     assert client.snapshot_settings_read_supported is True
 
     client.responses = [(500, {"error": "server"})]
+    with pytest.raises(api_snapshot_module.CannotConnect, match="HTTP 500"):
+        asyncio.run(client._async_get_snapshot_settings_once())
+
+
+@pytest.mark.parametrize("payload", [
+    None, "<html>Example login</html>", {}, {"error": "example"},
+    {"data": {"unknown": []}}, {"personal": None}, {"shared": {}},
+    {"shared": [None]}, {"shared": [{"unknown": "example"}]},
+    [{"type": "unknown", "id": "example"}],
+    {"shared": [{"sharedDrive": {"id": "a", "name": "Example"}}, {}]},
+])
+def test_snapshot_settings_rejects_malformed_success_response(payload) -> None:
+    """An HTTP success does not make an unknown or partial target list valid."""
+    client = SnapshotWriteClient()
+    client._snapshot_settings_read_supported = None
+    client._login_data = {}
+    client.responses = [(200, payload)]
+    with pytest.raises(api_snapshot_module.UnexpectedResponse):
+        asyncio.run(client._async_get_snapshot_settings_once())
+    assert client.snapshot_settings_read_supported is None
+
+
+@pytest.mark.parametrize("payload", [[], {"data": []}, {"shared": []}, {"personal": []}])
+def test_snapshot_settings_accepts_known_empty_response(payload) -> None:
+    """Recognized empty list variants are authoritative empty target sets."""
+    client = SnapshotWriteClient()
+    client._snapshot_settings_read_supported = None
+    client._login_data = {}
+    client.responses = [(200, payload)]
     assert asyncio.run(client._async_get_snapshot_settings_once()) == []
+    assert client.snapshot_settings_read_supported is True
 
 
 def test_snapshot_wrapper_methods_retry_once_after_invalid_auth() -> None:
@@ -1337,6 +1387,11 @@ def test_snapshot_wrapper_methods_retry_once_after_invalid_auth() -> None:
     assert client.login_count == 1
 
     class RetryWriteClient(SnapshotAuthRetryClient):
+        _snapshot_settings_lock = asyncio.Lock()
+
+        async def async_get_snapshot_settings(self):
+            return [{"id": "user-1", "type": "mydrive"}]
+
         async def _async_update_snapshot_target_settings_once(self, target, update):
             if self.fail_once:
                 self.fail_once = False
@@ -1352,13 +1407,55 @@ def test_snapshot_wrapper_methods_retry_once_after_invalid_auth() -> None:
     assert client.login_count == 1
 
 
+def test_snapshot_settings_serialize_and_merge_fresh_target_state() -> None:
+    """Concurrent limit and schedule writes must preserve both changes."""
+    from tests.api_client_stubs import UnifiUnasApiClient
+
+    async def run():
+        client = UnifiUnasApiClient(object(), host="console.example", api_key="test-key")
+        current = {"id": "target-1", "type": "shared", "max_count": 10, "schedule_time": "01:00"}
+        stale = dict(current)
+        writes = []
+
+        async def read():
+            await asyncio.sleep(0)
+            return [dict(current)]
+
+        async def write(target, update):
+            await asyncio.sleep(0)
+            current.update(target)
+            if update.max_count is not None:
+                current["max_count"] = update.max_count
+            if update.schedule_time is not None:
+                current["schedule_time"] = update.schedule_time
+            writes.append(dict(current))
+
+        client.async_get_snapshot_settings = read
+        client._async_update_snapshot_target_settings_once = write
+        await asyncio.gather(
+            client.async_update_snapshot_target_settings(stale, max_count=20),
+            client.async_update_snapshot_target_settings(stale, schedule_time="02:00"),
+        )
+        assert current["max_count"] == 20
+        assert current["schedule_time"] == "02:00"
+        assert len(writes) == 2
+
+        current["id"] = "replacement-target"
+        with pytest.raises(api_snapshot_module.UnexpectedResponse, match="no longer available"):
+            await client.async_update_snapshot_target_settings(stale, max_count=30)
+        assert len(writes) == 2
+        assert not client._snapshot_settings_lock.locked()
+
+    asyncio.run(run())
+
+
 def test_snapshot_create_405_marks_endpoint_unsupported() -> None:
     """Snapshot create 405 should be handled without a missing-constant NameError."""
     client = SnapshotStatusClient(405)
 
     try:
         asyncio.run(
-            client._async_create_snapshot_once(
+            client._async_create_snapshot_with_paths(
                 "/proxy/drive/api/v1/snapshots/shared/Shared_Drive",
                 {"description": "", "locked": False},
             )
@@ -1377,8 +1474,8 @@ def test_snapshot_inventory_405_marks_endpoint_unsupported() -> None:
 
     try:
         asyncio.run(
-            client._async_get_snapshot_inventory_once(
-                "/proxy/drive/api/v1/snapshots/shared/Shared_Drive",
+            client._async_get_snapshot_inventory_with_paths(
+                ("/proxy/drive/api/v1/snapshots/shared/Shared_Drive",),
             )
         )
     except api_snapshot_module.UnsupportedFeature:
@@ -1387,6 +1484,25 @@ def test_snapshot_inventory_405_marks_endpoint_unsupported() -> None:
         raise AssertionError("405 should raise UnsupportedFeature")
 
     assert client._snapshot_inventory_supported is False
+
+
+@pytest.mark.parametrize("operation", ["create", "inventory"])
+@pytest.mark.parametrize("known_support", [None, True])
+def test_snapshot_alias_failure_preserves_capability_and_recovers(operation, known_support):
+    """A missing alias followed by a transient failure is not unsupported."""
+    client = SnapshotWriteClient()
+    flag = f"_snapshot_{operation}_supported_by_type"
+    if known_support is not None:
+        getattr(client, flag)["shared"] = known_support
+    target = {"id": "shared-id", "type": "shared", "shared_drive_name": "Example"}
+    action = client.async_create_snapshot_target if operation == "create" else client.async_get_snapshot_inventory_target
+    client.responses = [(404, {}), (500, {})]
+    with pytest.raises(api_snapshot_module.CannotConnect):
+        asyncio.run(action(target))
+    assert getattr(client, flag).get("shared") is known_support
+    client.responses = [(404, {}), (200, [])]
+    asyncio.run(action(target))
+    assert getattr(client, flag)["shared"] is True
 
 
 def test_snapshot_capability_helpers_handle_missing_flags_and_unknown_user() -> None:

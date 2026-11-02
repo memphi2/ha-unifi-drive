@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from aiohttp import ClientSession
@@ -82,6 +83,7 @@ class UnifiUnasApiClient(
         self._fan_mode_write_payload_hint: str | None = None
         self._backup_tasks_read_supported: bool | None = None
         self._snapshot_settings_read_supported: bool | None = None
+        self._snapshot_settings_lock = asyncio.Lock()
         self._snapshot_settings_write_supported: bool | None = None
         self._snapshot_settings_write_supported_by_type: dict[str, bool] = {}
         self._snapshot_create_supported: bool | None = None

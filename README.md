@@ -3,383 +3,231 @@
 [![Validate](https://github.com/memphi2/ha-unifi-drive/actions/workflows/validate.yml/badge.svg)](https://github.com/memphi2/ha-unifi-drive/actions/workflows/validate.yml)
 [![Quality](https://img.shields.io/badge/Quality-HA%20QS%20Platinum%20Track-0366d6?style=flat-square)](custom_components/unifi_unas/quality_scale.yaml)
 [![GitHub Release](https://img.shields.io/github/v/release/memphi2/ha-unifi-drive?display_name=tag&sort=semver&label=release)](https://github.com/memphi2/ha-unifi-drive/releases/latest)
-[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://www.hacs.xyz/)
 [![License MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Local Home Assistant custom integration for compatible UniFi Drive / UNAS
-systems.
-
-The integration talks directly to the device on your local network. It does not
-use UniFi cloud services for normal operation and is intended for trusted local
-Home Assistant installations.
+Monitor your UniFi Drive / UNAS storage in Home Assistant and automate the local
+actions you choose to enable. The integration connects directly to your NAS;
+normal operation does not use UniFi cloud services.
 
 <p align="center">
-  <img src="docs/images/drive-storage-card.png" alt="UniFi Drive storage overview card screenshot" width="420">
+  <img src="docs/images/drive-storage-card.png" alt="Example UniFi Drive storage dashboard" width="420">
 </p>
 
-## What You Get
+## Features
 
-- One Home Assistant device per configured UniFi Drive / UNAS system.
-- Storage, pool, drive, temperature, throughput, uptime, version and health
-  monitoring.
-- Discovery through UniFi local discovery and Zeroconf/mDNS, with duplicate
-  protection for noisy or mixed networks.
-- Stable local polling with quieter offline behavior when the device is shut
-  down or temporarily unreachable.
-- Optional Wake-on-LAN and local control entities for users who explicitly want
-  them.
-- Privacy-safe diagnostics for support reports.
-
-## Current Release
-
-- Current release line: `v0.8.8`
-- Home Assistant setup: UI config flow, discovery, manual setup, reauth,
-  reconfigure and options flow
-- HACS type: custom integration
-- IoT class: local polling
-- Quality target: Bronze/Silver/Gold tracked as implemented, Platinum-track
-  hardening in progress
-- Validation coverage: Home Assistant `2024.8.0` minimum and current
-  `2026.10.0` target line
-- Current maintenance focus: Home Assistant compatibility and robust dynamic
-  drive discovery during pool expansion
-
-This is a custom integration and does not claim official Home Assistant Core
-certification.
-
-## Feature Matrix
-
-| Area | Default | Notes |
-| --- | --- | --- |
-| Core monitoring | enabled | Capacity, usage, health, versions, uptime, throughput and temperatures. |
-| Discovery | enabled | UniFi local discovery and Zeroconf/mDNS candidates are deduplicated. |
-| Wake-on-LAN | optional | Useful when the device may be powered off intentionally. |
-| Snapshot inventory | optional | Firmware and permission dependent. |
-| Snapshot settings | optional | Non-destructive; no delete or restore actions are provided. |
-| Fan, backup and update controls | optional | Local endpoint and permission dependent. |
-| Restart/shutdown buttons | optional | Exposed only when enabled; use intentionally. |
-
-## Entities
-
-The integration creates a focused default device page and keeps noisier or
-experimental controls out of the way unless enabled.
-
-| Platform | Examples |
+| Feature | What you get |
 | --- | --- |
-| `sensor` | capacity, used/available, usage %, pool health, drive health, temperatures, throughput, uptime, versions |
-| `binary_sensor` | storage and maintenance problem indicators |
-| `button` | Wake-on-LAN, restart, shutdown, backup tasks, snapshot create |
-| `switch` / `number` / `select` / `time` | snapshot settings and fan mode controls |
-| `update` | UniFi OS / Drive update entities when available |
+| Storage monitoring | Pool and drive health, capacity, usage, temperatures and throughput. |
+| System monitoring | Uptime, firmware versions and supported system metrics. |
+| Discovery | UniFi local discovery and Zeroconf/mDNS, with duplicate-device protection. |
+| Wake-on-LAN | Optional startup of a powered-off NAS. |
+| Snapshot inventory | Optional snapshot counts and target information where supported. |
+| Local controls | Optional snapshot creation/settings, fan controls, backup tasks, updates, restart and shutdown. |
 
-The complete entity overview is in [docs/entities.md](docs/entities.md).
+**Local controls are experimental** and dependent on firmware and account
+permissions. Fan and snapshot entities are enabled through options; all control
+actions require an explicit user or automation request. Snapshot delete and
+restore actions are not provided. Lowering retention may let the NAS expire older snapshots.
+
+See the [entity overview](docs/entities.md) for the available sensors and controls.
 
 ## Options
 
-Open the integration entry and choose `Configure` to adjust options.
+Open `Settings` -> `Devices & services` -> **UniFi Drive / UNAS** -> `Configure`.
 
-Common choices:
+- Enable Wake-on-LAN and provide the device's MAC address.
+- Choose the polling interval and enable fan or snapshot entities as needed.
+- Enable discovery diagnostics temporarily when investigating detection problems.
 
-- Enable Wake-on-LAN and provide a MAC address when the device may be off.
-- Enable snapshot inventory when you want per-target snapshot visibility.
-- Enable snapshot controls only after confirming endpoint support and
-  permissions.
-- Enable fan, backup or update controls only for accounts that should be able
-  to perform those local actions.
-- Enable discovery diagnostics only while investigating discovery behavior.
-
-Reconfigure and reauth flows preserve the existing Home Assistant device
-identity where possible.
+For a monitoring-only dashboard, disable unwanted control entities. Backup-task,
+restart/shutdown and update entities are not separate feature switches in options.
 
 ## Supported Devices
 
-Current compatibility evidence is intentionally conservative:
+Live testing and community feedback cover **UNAS2** and **UNAS4**, with different
+coverage by feature and firmware. Other UniFi Drive / UNAS models are not yet
+verified; non-UniFi NAS devices are unsupported.
 
-| Device scope | Firmware | Evidence |
-| --- | --- | --- |
-| UNAS2 | UniFi OS `5.1.8` | integration lifecycle tested |
-| UNAS2 | UniFi OS `5.1.10` | integration lifecycle and optional controls tested |
-| UNAS2 | UniFi OS `5.1.19`, Drive `4.3.6` | throughput confirmed |
-| UNAS4 | UniFi OS `5.1.16`, Drive `4.3.6` | throughput confirmed through community feedback on `v0.8.4` |
-| Other UniFi Drive / UNAS models | unknown | expected when endpoint shape and permissions match |
-| Non-UniFi NAS devices | any | unsupported |
-
-See [docs/firmware_matrix.md](docs/firmware_matrix.md) for the tracked evidence.
+Check the [device and firmware matrix](docs/firmware_matrix.md) for the tested
+combinations and the scope of each result.
 
 ## Installation
 
-Versions before `0.8.0` should be removed and installed again instead of being
-upgraded in place.
+Requires Home Assistant `2024.8.0` or newer and local network access to the NAS.
 
-### HACS Custom Repository
+### Home Assistant Marketplace
 
-1. Open HACS.
-2. Go to `Integrations`.
-3. Open the three-dot menu and choose `Custom repositories`.
-4. Add this repository URL:
+[![Open your Home Assistant instance and open this repository in the Marketplace](https://my.home-assistant.io/badges/marketplace_repository.svg)](https://my.home-assistant.io/redirect/marketplace_repository/?owner=memphi2&repository=ha-unifi-drive&category=integration)
 
-   ```text
-   https://github.com/memphi2/ha-unifi-drive
-   ```
+On Home Assistant `2026.11+`:
 
-5. Select category `Integration`.
-6. Install `UniFi Drive / UNAS`.
-7. Restart Home Assistant.
-8. Add `UniFi Drive / UNAS` from `Settings` -> `Devices & services`.
+1. Open the button above, or go to `Settings` -> `Marketplace`.
+2. Find **UniFi Drive / UNAS** by **memphi2**, install it and confirm the
+   community-integration notice.
+3. Follow any restart request, then add **UniFi Drive / UNAS** under
+   `Settings` -> `Devices & services`.
 
-### Manual Installation
+The integration is in the shared catalog; no custom repository is needed.
 
-Copy the integration directory to:
+### HACS
 
-```text
-/config/custom_components/unifi_unas/
-```
+On Home Assistant versions before `2026.11`, find **UniFi Drive / UNAS** in
+HACS, download it and restart Home Assistant. Then add the integration under
+`Settings` -> `Devices & services`. No custom repository is needed.
 
-Then restart Home Assistant and add `UniFi Drive / UNAS` from the UI.
-
-### Nested Folder Recovery
-
-If the integration was installed one folder level too deep:
-
-```text
-/config/custom_components/unifi_unas/unifi_unas/
-```
-
-move the inner `unifi_unas` folder up to `/config/custom_components/` so the
-final path is `/config/custom_components/unifi_unas/`, then restart Home
-Assistant.
+For manual installation, see the [installation guide](docs/installation.md).
 
 ## First Setup
 
-Add the integration from `Settings` -> `Devices & services` -> `Add integration`
--> `UniFi Drive / UNAS`.
+Select a discovered device or enter its address manually. Manual setup remains
+available when discovery cannot cross VLANs or does not find the NAS.
 
-You can start from an automatic discovery card or enter the device manually.
-Manual setup remains available even when discovery is blocked by VLANs, mDNS
-routing or incomplete network metadata.
-
-The setup form accepts:
-
-| Field | Notes |
+| Setting | What to enter |
 | --- | --- |
-| Host | IP address or DNS name. URLs with scheme/port are also normalized. |
-| Port | Usually `443` for SSL or `80` without SSL. |
-| SSL / certificate verification | Match your local UniFi OS endpoint. |
-| Username/password | Local account session authentication. |
-| API key | Optional local API-key based authentication when supported. |
+| Host | The NAS IP address or DNS name. |
+| Port | Usually `443` with SSL, or `80` without it. |
+| SSL and certificate verification | Match the device's local connection settings. |
+| Username and password | A local account with permissions for the features you need. |
+| API key | An optional alternative when supported by the device. |
 
-If both username/password and API key are configured, the local account session
-is used first.
+When both credential types are configured, the local account session is tried
+first. After connecting, select the optional features you want to expose.
 
-After the connection succeeds, the optional-features step lets you choose which
-control surfaces should be exposed. Keep optional controls disabled if you only
-want monitoring.
+To change the device address, use `Reconfigure` on the existing integration
+entry. For expired or changed credentials, follow the reauthentication prompt
+instead of adding a second device.
 
-## Discovery Behavior
+## Updates
 
-Discovery is treated as a setup hint, not as blind trust.
+Back up Home Assistant and read the [release notes](https://github.com/memphi2/ha-unifi-drive/releases).
+Install the update offered by Marketplace under `Settings` -> `Updates`,
+or by HACS on older HA versions, then complete any restart request.
 
-- Existing configured devices are hidden from normal discovery selection.
-- Multiple records for the same device are deduplicated through local identity
-  hints.
-- Conflicting hints are recorded for diagnostics instead of forcing a risky
-  automatic match.
-- Discovery metadata updates can refresh known hints without reloading the
-  integration or writing config-entry storage on every repeated observation.
-- VLANs and multiple interfaces can still require manual setup when mDNS or MAC
-  hints are incomplete.
+Keep existing entries when updating integration `0.8.0+`. Moving from HACS to
+Marketplace does not require a reinstall.
 
-## Offline Behavior
-
-The integration expects that a NAS can be intentionally powered off.
-
-- Offline state should not create repeated repair noise by itself.
-- Wake-on-LAN stays useful when configured.
-- Core entities stay loaded and become unavailable instead of preserving stale
-  live values.
-- Recovery is handled through normal coordinator refreshes after the device
-  becomes reachable again.
+Versions before `0.8.0` must be removed and reinstalled; follow the
+[legacy upgrade instructions](docs/installation.md#upgrading-from-before-080).
 
 ## Data Updates
 
-Core monitoring uses local polling with a minimum update interval of `30s`.
+Monitoring uses local polling with a minimum interval of 30 seconds. System and
+network metadata reads each have a 2.5-second timeout; slow metadata cannot hold
+up a successful storage read for the full transport timeout. Optional
+polling shares a ten-second budget with time reserved for each enabled feature,
+so a slow endpoint cannot block later features or core updates indefinitely.
+Snapshot inventory normally refreshes every ten minutes. Larger batches resume
+over subsequent polls without discarding completed target reads; interrupted
+targets do not prevent other targets from progressing.
 
-Optional endpoints are isolated from core monitoring. If a snapshot, fan,
-backup or update endpoint is unsupported or permission-blocked, the integration
-keeps the monitoring surface usable and reports the optional capability state
-where possible.
+After two consecutive connection failures, `Device online` reports off and
+`System status` reports offline. Core monitoring sensors retain their last known
+readings; these are cached values, not current measurements. Gate automations on
+`Device online` before using them. Local controls become unavailable while offline.
 
-Detailed validation notes are in [docs/validation.md](docs/validation.md).
+A powered-off NAS is expected. Being offline alone does not trigger repair prompts.
+Wake-on-LAN remains available when configured; discovery and broadcast delivery
+depend on your network, especially across VLANs.
 
 ## Services
 
-Registered domain services:
+Available actions include `unifi_unas.wake_on_lan`, `reboot`, `shutdown`,
+`set_fan_mode`, `create_snapshot`, `set_snapshot_limit` and
+`set_snapshot_schedule`, all under the `unifi_unas` domain.
 
-```text
-unifi_unas.wake_on_lan
-unifi_unas.reboot
-unifi_unas.shutdown
-unifi_unas.set_fan_mode
-unifi_unas.create_snapshot
-unifi_unas.set_snapshot_limit
-unifi_unas.set_snapshot_schedule
-```
+For multiple configured devices, pass `entry_id` to select the intended NAS.
+Except for Wake-on-LAN, control actions require an online device and the relevant
+device-side permissions.
 
-In multi-device setups, pass `entry_id` to target a specific UNAS entry.
+## Automation Examples
 
-Examples are in [docs/examples.md](docs/examples.md).
-
-## Use Cases And Automation Examples
-
-Typical Home Assistant uses:
-
-- Alert when storage health changes or capacity crosses a threshold.
-- Show pool, drive and temperature health on a maintenance dashboard.
-- Wake the device before a scheduled maintenance or backup window.
-- Keep snapshot settings visible for supported targets.
-- Track firmware/update availability without opening the UniFi UI.
-
-YAML examples are in [docs/examples.md](docs/examples.md).
+Use storage-health changes for notifications, capacity thresholds for alerts,
+or Wake-on-LAN before a backup window. See the ready-to-adapt
+[automation examples](docs/examples.md).
 
 ## Privacy And Diagnostics
 
-Diagnostics are designed for support without exposing local secrets.
+Download diagnostics from the integration entry when reporting an issue.
+The export includes runtime, discovery and capability information; credentials,
+local addresses, device identifiers and snapshot/share names are redacted or
+reduced to presence flags.
 
-Included:
+Snapshot preview lists, IDs, names and descriptions remain visible in current
+entity attributes but are excluded from Recorder history. Counts and timestamps
+remain recordable. Large previews therefore do not duplicate their full contents
+in the database on each change.
+Snapshot controls also exclude duplicate total/locked counts from recorded
+attributes; the inventory sensor retains count history. Live attribute changes
+can still generate Recorder state rows even when the recorded attributes are
+unchanged. Exclude individual control entities in your Recorder configuration
+if you do not need their history.
 
-- runtime state and capability flags
-- monitoring and discovery health
-- payload shape metadata
-- snapshot capability state without raw target names
-
-Redacted or reduced to presence flags:
-
-- credentials and API keys
-- hostnames, IP addresses and MAC addresses
-- serial-like identifiers and token-like values
-- snapshot target identifiers and share names
-- raw local API payload values
-
-Export diagnostics from the integration entry when reporting an issue.
-Release validation scans tracked files, existing public GitHub release/PR
-surfaces and the generated HACS ZIP for common secret, local artifact,
-personal identifier, local-network, copyright, trademark/branding and
-vendor-asset mistakes before publication.
+Review attachments before posting. Do not share credentials or unredacted device
+API responses. Report reproducible problems through
+[GitHub issues](https://github.com/memphi2/ha-unifi-drive/issues).
 
 ## Troubleshooting
 
-| Symptom | Check |
+| Problem | What to check |
 | --- | --- |
-| Setup cannot connect | Verify host, port, SSL and certificate settings from the Home Assistant host. |
-| Authentication fails | Recheck local account permissions or API-key validity. |
-| Discovery does not show the device | Use manual setup; mDNS often does not cross VLANs without explicit relay support. |
-| Discovery card keeps appearing | Check diagnostics for identity confidence, conflicts and prompt-suppression state. |
-| Monitoring works but controls fail | The account may not have permission for optional local endpoints. |
-| Snapshot targets are missing | Enable snapshot options and verify endpoint support on this firmware. |
-| Device is off | This is expected; use Wake-on-LAN when configured. |
+| Cannot connect | Host, port, SSL settings and reachability from Home Assistant. |
+| Authentication fails | Local account permissions or API-key validity; use reauthentication for changed credentials. |
+| Device is not discovered | Add it manually; mDNS may not cross your VLANs. |
+| Device is unavailable | Check whether it is powered off; use Wake-on-LAN when configured. |
+| Monitoring works, controls fail | The firmware or account may not support the optional endpoint. |
+| Snapshot target repair | Check the target still exists and review the snapshot options. |
+| Update is not offered | Check the minimum HA version and allow time for the catalog to refresh. |
 
-More detail is in [docs/troubleshooting.md](docs/troubleshooting.md).
+More detailed checks are in the [troubleshooting guide](docs/troubleshooting.md).
 
 ## Known Limitations
 
-- This is an unofficial community integration and not vendor-supported.
-- Endpoint behavior and permission requirements can vary by firmware.
-- Snapshot controls are intentionally opt-in and non-destructive.
-- Snapshot delete and restore actions are intentionally not provided.
-- Discovery quality depends on local network metadata quality.
-- Wake-on-LAN may need directed-broadcast support depending on your network.
-- Live-device validation is strongest on the tested UNAS2 target.
+- Firmware and permissions determine which optional endpoints are available.
+- Discovery and Wake-on-LAN depend on local routing and broadcast support.
+- Test coverage on one model/firmware does not guarantee every feature on another.
 
-See [docs/known_limitations.md](docs/known_limitations.md).
+See [known limitations](docs/known_limitations.md) before enabling local controls.
 
 ## Removal
 
-1. In Home Assistant, open `Settings` -> `Devices & services`.
-2. Open the `UniFi Drive / UNAS` integration entry.
-3. Choose `Delete`.
-4. Restart Home Assistant if you also want to remove custom integration files.
-5. Remove `/config/custom_components/unifi_unas/` or uninstall it through HACS.
+1. Delete the integration's entries under `Settings` -> `Devices & services`.
+2. To remove the code too, uninstall it through Marketplace or HACS and complete
+   the restart request. For a manual install, follow the [removal guide](docs/installation.md#removal).
+3. Review dashboards and automations that referenced the removed entities.
 
-Removing only the files does not delete the Home Assistant config entry.
+Removal does not delete NAS data or revoke device-side accounts/API keys.
+
+## Maturity And Roadmap
+
+Core monitoring is mature beta, discovery is hardened beta, and snapshot
+inventory is beta. Local controls remain experimental.
+
+Development is Platinum-oriented, but full Bronze/Silver/Gold compliance is not
+claimed. Core branding verification, flow coverage, per-module coverage, cached
+sensor availability and strict typing still have documented gaps in
+[quality_scale.yaml](custom_components/unifi_unas/quality_scale.yaml) and the
+[quality roadmap](docs/platinum_readiness.md). This is not official Home Assistant
+Core certification.
 
 ## Documentation
 
-| Topic | Document |
-| --- | --- |
-| Installation and day-to-day use | This README |
-| Entity surface overview | [docs/entities.md](docs/entities.md) |
-| Automation examples | [docs/examples.md](docs/examples.md) |
-| Troubleshooting guide | [docs/troubleshooting.md](docs/troubleshooting.md) |
-| Known limitations | [docs/known_limitations.md](docs/known_limitations.md) |
-| Supported model and firmware evidence | [docs/firmware_matrix.md](docs/firmware_matrix.md) |
-| Maintenance and LTS policy | [docs/lts.md](docs/lts.md) |
-| Validation and release gates | [docs/validation.md](docs/validation.md) |
-| Bronze readiness summary | [docs/bronze_readiness.md](docs/bronze_readiness.md) |
-| Platinum readiness audit snapshot | [docs/platinum_readiness.md](docs/platinum_readiness.md) |
-| Platinum-track implementation plan | [docs/platinum_prep.md](docs/platinum_prep.md) |
-| Live HA validation report (`v0.6.2`) | [docs/live_test_report_v0.6.2.md](docs/live_test_report_v0.6.2.md) |
-| Live recorder/config-entry DB probe | [docs/live_db_probe.md](docs/live_db_probe.md) |
-| Legal and interoperability policy | [docs/legal.md](docs/legal.md) |
-
-## Current Maturity
-
-Core monitoring is treated as mature beta for this custom integration. Discovery,
-diagnostics, lifecycle handling, reauth/reconfigure, HACS metadata and
-repository validation have focused test coverage and release gates.
-
-Optional local controls remain experimental where they depend on undocumented
-local UniFi Drive / UniFi OS endpoint behavior, firmware version and account
-permissions.
-
-## Silver Gold Platinum Roadmap
-
-| Level | Current state | Next focus |
-| --- | --- | --- |
-| Bronze | Implemented in tracked rules | Keep release metadata and docs consistency strict |
-| Silver | Implemented in tracked rules | Keep coverage and runtime stability gates green |
-| Gold | Implemented in tracked rules | Preserve diagnostics, discovery and repair quality under firmware changes |
-| Platinum | In progress | Expand strict typing scope and maintain proof-backed runtime hardening |
-
-The active Platinum-oriented plan is maintained in
-[docs/platinum_prep.md](docs/platinum_prep.md).
-
-## Validation
-
-Local repository gates:
-
-```bash
-python scripts/check_repo.py
-ruff check custom_components tests scripts
-python -m pytest -q
-python -m compileall -q custom_components/unifi_unas tests
-git diff --check
-```
-
-Validation flow details and optional live checks are documented in
-[docs/validation.md](docs/validation.md).
+- [Installation, updates and removal](docs/installation.md)
+- [Entities](docs/entities.md) and [automation examples](docs/examples.md)
+- [Device and firmware compatibility](docs/firmware_matrix.md)
+- [Troubleshooting](docs/troubleshooting.md) and [limitations](docs/known_limitations.md)
+- [Maintenance and LTS policy](docs/lts.md)
+- [Validation and contribution checks](docs/validation.md)
 
 ## Legal Notes
 
 This is an unofficial community integration. It does not claim affiliation,
-sponsorship, authorization, approval, or endorsement by Ubiquiti Inc., Home
-Assistant, HACS, or their respective owners.
+sponsorship or endorsement by Ubiquiti Inc., Home Assistant or HACS. Product names
+are used only as descriptive compatibility references.
 
-Product names such as UniFi, UniFi Drive, UniFi OS, Ubiquiti, and UNAS are used
-only as descriptive compatibility references.
+Ubiquiti and UniFi product names and marks belong to Ubiquiti Inc.; other marks
+belong to their respective owners.
 
-The repository does not include official Ubiquiti logos, copied vendor web
-assets, or proprietary Ubiquiti source code.
+The repository does not include official Ubiquiti logos or proprietary Ubiquiti
+source code. See [docs/legal.md](docs/legal.md) for the legal and asset policy.
 
-Protocol and endpoint notes document observed interoperability behavior only.
-They are not a copy of, or a substitute for, vendor software or specifications.
-
-See [docs/legal.md](docs/legal.md) for the repository legal and asset hygiene
-policy.
-
-## Acknowledgements
-
-Development and hardening work for this project was assisted by OpenAI Codex.
-
-## License
-
-MIT
+Licensed under the [MIT License](LICENSE).

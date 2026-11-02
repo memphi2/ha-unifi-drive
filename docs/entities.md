@@ -23,7 +23,23 @@ UNAS entry.
 
 ## Availability Model
 
-- Coordinator-backed entities become unavailable when the device is unreachable.
+- After two consecutive connection failures, Device online reports off and
+  System status reports offline. Core monitoring sensors keep last-known values;
+  they are cached observations, not current measurements. Gate automations on
+  Device online before using these readings.
+- Local controls become unavailable offline; configured Wake-on-LAN stays
+  available. Offline alone is expected and does not create a repair issue.
 - Optional feature entities can stay unavailable when endpoints are unsupported
   or blocked by permissions.
 - No direct API calls happen from entity properties.
+
+## Names And History
+
+Pool, drive, snapshot and backup names combine the device-provided name with a
+translated entity label. Unique IDs are unchanged; user-assigned entity names
+and existing registry IDs are preserved.
+
+Snapshot controls keep live total/locked counts for dashboards but exclude
+those duplicate attributes from Recorder. The inventory sensor retains count
+history. Excluded attributes can still cause state rows when their live values
+change; use Recorder entity exclusions for controls whose history is unnecessary.

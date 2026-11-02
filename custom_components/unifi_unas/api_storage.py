@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -10,6 +11,7 @@ from .const import DRIVE_STORAGE_PATH, NETWORK_IO_PATH, SYSTEM_PATH
 from .security import safe_error_text
 
 _LOGGER = logging.getLogger(__name__)
+_METADATA_REQUEST_TIMEOUT = 2.5
 
 
 class ApiStorageMixin:
@@ -48,17 +50,19 @@ class ApiStorageMixin:
         if mode := self._extract_fan_mode(data):
             self._last_fan_mode = mode
         try:
-            system_data = await self._request_json("GET", SYSTEM_PATH)
+            async with asyncio.timeout(_METADATA_REQUEST_TIMEOUT):
+                system_data = await self._request_json("GET", SYSTEM_PATH)
             data["_system"] = system_data
             self._system_info = system_data
-        except (CannotConnect, InvalidAuth, UnexpectedResponse) as err:
+        except (CannotConnect, InvalidAuth, UnexpectedResponse, TimeoutError) as err:
             _LOGGER.debug(
                 "Could not read UniFi OS system metadata: %s",
                 safe_error_text(err),
             )
         try:
-            data["_network_io"] = await self._request_json("GET", NETWORK_IO_PATH)
-        except (CannotConnect, InvalidAuth, UnexpectedResponse) as err:
+            async with asyncio.timeout(_METADATA_REQUEST_TIMEOUT):
+                data["_network_io"] = await self._request_json("GET", NETWORK_IO_PATH)
+        except (CannotConnect, InvalidAuth, UnexpectedResponse, TimeoutError) as err:
             _LOGGER.debug(
                 "Could not read UniFi Drive network I/O metadata: %s",
                 safe_error_text(err),

@@ -63,14 +63,12 @@ AGGREGATE_BINARY_SENSOR_TYPES: tuple[AggregateBinarySensorDescription, ...] = (
 POOL_BINARY_SENSOR_TYPES: tuple[PoolBinarySensorDescription, ...] = (
     PoolBinarySensorDescription(
         key="pool_problem",
-        name="Problem",
         translation_key="pool_problem",
         device_class=BinarySensorDeviceClass.PROBLEM,
         value_fn=lambda pool: _pool_has_problem(pool),
     ),
     PoolBinarySensorDescription(
         key="pool_maintenance_active",
-        name="Maintenance Active",
         translation_key="pool_maintenance_active",
         value_fn=lambda pool: _pool_in_maintenance(pool),
     ),

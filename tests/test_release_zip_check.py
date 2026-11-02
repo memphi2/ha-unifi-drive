@@ -17,11 +17,25 @@ def _load_release_zip_module():
     )
 
 
-def _write_zip(path: Path, members: dict[str, str | bytes]) -> None:
+def _write_zip(path: Path, members: dict[str, str | bytes], *, include_license: bool = True) -> None:
     """Write a small ZIP fixture."""
     with ZipFile(path, "w") as archive:
+        if include_license:
+            archive.writestr("unifi_unas/LICENSE", (ROOT / "LICENSE").read_bytes())
         for name, content in members.items():
             archive.writestr(name, content)
+
+
+@pytest.mark.parametrize("license_text", [None, "wrong license"])
+@pytest.mark.parametrize("license_path", ["unifi_unas/LICENSE", "unifi_unas\\LICENSE"])
+def test_release_zip_requires_correct_license(tmp_path, license_text, license_path) -> None:
+    module = _load_release_zip_module()
+    members = {"unifi_unas/__init__.py": "", "unifi_unas/manifest.json": "{}"}
+    if license_text is not None:
+        members[license_path] = license_text
+    path = tmp_path / "release.zip"
+    _write_zip(path, members, include_license=False)
+    assert any("LICENSE" in issue for issue in module._release_zip_issues(path))
 
 
 def test_release_zip_accepts_integration_root(tmp_path) -> None:

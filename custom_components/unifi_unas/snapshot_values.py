@@ -70,14 +70,15 @@ def _bool_value(value: Any) -> bool | None:
 
 
 def _payload_debug_shape(payload: Any) -> dict[str, Any] | str:
-    """Return payload keys without exposing payload values."""
+    """Return only structure counts; object keys may be local identifiers too."""
     if not isinstance(payload, dict):
         return type(payload).__name__
 
-    shape: dict[str, Any] = {"top_level_keys": sorted(str(key) for key in payload)}
+    shape: dict[str, Any] = {"top_level_count": len(payload)}
     data = payload.get("data")
     if isinstance(data, dict):
-        shape["data_keys"] = sorted(str(key) for key in data)
+        shape["data_type"] = "dict"
+        shape["data_count"] = len(data)
     elif isinstance(data, list):
         shape["data_type"] = "list"
         shape["data_count"] = len(data)

@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from pathlib import Path
-import sys
 from typing import Any
 from unittest.mock import patch
 
 import pytest
+
+from tests.ha_test_helpers import (
+    ROOT,
+    ensure_repo_custom_components_path as _ensure_repo_custom_components_path,
+)
 
 try:
     from homeassistant.const import (
@@ -30,11 +33,6 @@ except (ImportError, AttributeError):
     CONF_VERIFY_SSL = "verify_ssl"
 
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-CUSTOM_COMPONENTS = str(ROOT / "custom_components")
 GIB = 1024**3
 
 
@@ -42,23 +40,6 @@ GIB = 1024**3
 def hass_config_dir() -> str:
     """Point Home Assistant at this repository's test config directory."""
     return str(ROOT)
-
-
-@pytest.fixture(autouse=True)
-def _enable_custom_integrations(enable_custom_integrations) -> None:
-    """Allow Home Assistant to load the integration from local custom components."""
-    _ensure_repo_custom_components_path()
-
-
-def _ensure_repo_custom_components_path() -> None:
-    """Keep Home Assistant loading this repository's integration path."""
-    import custom_components
-
-    if not hasattr(custom_components, "__path__"):
-        custom_components.__path__ = [str(ROOT / "custom_components")]
-
-    if CUSTOM_COMPONENTS not in custom_components.__path__:
-        custom_components.__path__.append(CUSTOM_COMPONENTS)
 
 
 def _entry_data() -> dict[str, Any]:
@@ -217,6 +198,25 @@ def _state(hass, entity_id: str) -> str:
     state = hass.states.get(entity_id)
     assert state is not None, entity_id
     return state.state
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language,capacity,temperature,maintenance", [
+    ("en", "Capacity", "Temperature", "Maintenance active"),
+    ("de", "Kapazitaet", "Temperatur", "Wartung aktiv"),
+])
+async def test_pool_and_drive_names_are_translated(hass, language, capacity, temperature, maintenance):
+    """Dynamic pool and drive names work even for disabled diagnostic entities."""
+    from homeassistant.helpers import entity_registry as er
+
+    hass.config.language = language
+    entry = await _async_setup_monitoring_entry(hass, _MonitoringClient())
+    entities = er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
+    for key, suffix in (("pool_capacity", capacity), ("drive_temperature", temperature), ("pool_maintenance_active", maintenance)):
+        entity = next(item for item in entities if item.translation_key == key)
+        assert entity.original_name.startswith("Main ")
+        assert entity.original_name.endswith(suffix)
+        assert "{" not in entity.original_name
 
 
 @pytest.mark.asyncio

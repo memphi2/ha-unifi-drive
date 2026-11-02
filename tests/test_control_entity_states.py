@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-import sys
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import patch
 
 import pytest
+
+from tests.ha_test_helpers import (
+    ROOT,
+    ensure_repo_custom_components_path as _ensure_repo_custom_components_path,
+)
 
 try:
     from homeassistant.const import (
@@ -30,34 +33,10 @@ except (ImportError, AttributeError):
     CONF_VERIFY_SSL = "verify_ssl"
 
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-CUSTOM_COMPONENTS = str(ROOT / "custom_components")
-
-
 @pytest.fixture
 def hass_config_dir() -> str:
     """Point Home Assistant at this repository's test config directory."""
     return str(ROOT)
-
-
-@pytest.fixture(autouse=True)
-def _enable_custom_integrations(enable_custom_integrations) -> None:
-    """Allow Home Assistant to load the integration from local custom components."""
-    _ensure_repo_custom_components_path()
-
-
-def _ensure_repo_custom_components_path() -> None:
-    """Keep Home Assistant loading this repository's integration path."""
-    import custom_components
-
-    if not hasattr(custom_components, "__path__"):
-        custom_components.__path__ = [str(ROOT / "custom_components")]
-
-    if CUSTOM_COMPONENTS not in custom_components.__path__:
-        custom_components.__path__.append(CUSTOM_COMPONENTS)
 
 
 def _entry_data(**overrides: Any) -> dict[str, Any]:
@@ -169,6 +148,16 @@ class _ControlIntegrationClient:
 
     async def async_install_drive_update(self) -> None:
         return None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language,suffix", [("en", "Run backup"), ("de", "Backup starten")])
+async def test_backup_task_name_is_translated(hass, language, suffix):
+    """Backup labels use the platform translation without changing unique IDs."""
+    hass.config.language = language
+    entry = await _async_setup_control_entry(hass, _ControlIntegrationClient())
+    entity_id = _entity_id_for_unique_id(hass, entry, "device-1_backup_task-1")
+    assert hass.states.get(entity_id).attributes["friendly_name"] == f"UNAS Nightly Backup {suffix}"
 
 
 async def _async_setup_control_entry(hass, client, **data_overrides: Any):

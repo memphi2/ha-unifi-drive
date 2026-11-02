@@ -9,6 +9,8 @@ import sys
 import pytest
 
 HA_BACKED_TEST_FILES = {
+    "test_api_http_safety.py",
+    "test_config_flow_sessions.py",
     "test_control_entity_states.py",
     "test_core_monitoring_entity_states.py",
     "test_integration_entry_setup.py",
@@ -30,6 +32,19 @@ _ORIGINAL_MODULES = {
         for root in _MODULE_ROOTS_TO_RESTORE
     )
 }
+
+
+@pytest.fixture(autouse=True)
+def _prepare_ha_integration_namespace(request: pytest.FixtureRequest) -> None:
+    """Make every HA-backed file independently runnable after stub cleanup."""
+    if request.node.path.name not in HA_BACKED_TEST_FILES:
+        return
+    if find_spec("pytest_homeassistant_custom_component") is None:
+        return
+    request.getfixturevalue("enable_custom_integrations")
+    from tests.ha_test_helpers import ensure_repo_custom_components_path
+
+    ensure_repo_custom_components_path()
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:

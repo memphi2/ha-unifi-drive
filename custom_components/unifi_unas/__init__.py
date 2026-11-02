@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 import logging
@@ -52,7 +53,7 @@ from .discovery_identity import (
     entry_matches_discovery_flow_context,
     should_write_discovery_identity_update,
 )
-from .device import build_device_info
+from .device import build_device_info, device_registry_metadata
 from .entry_options import (
     entry_bool,
     entry_value,
@@ -165,7 +166,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: UnifiDriveConfigEntry) -
             coordinator.async_refresh_optional_features(),
             f"{DOMAIN} optional feature startup refresh",
         )
-    except Exception:
+    except (Exception, asyncio.CancelledError):
         remove_update_listener()
         if remove_snapshot_cleanup_listener is not None:
             remove_snapshot_cleanup_listener()
@@ -187,13 +188,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: UnifiDriveConfigEntry) 
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unload_ok:
-        from .snapshot_entities import _clear_snapshot_target_entities_for_coordinator
-
-        coordinator = coordinator_from_entry_or_none(entry) or hass.data.get(
-            DOMAIN, {}
-        ).get(entry.entry_id)
-        if coordinator is not None:
-            _clear_snapshot_target_entities_for_coordinator(coordinator)
         _async_clear_entry_runtime(hass, entry)
     return cast(bool, unload_ok)
 
@@ -212,6 +206,13 @@ async def async_remove_config_entry_device(
 
 def _async_clear_entry_runtime(hass: HomeAssistant, entry: UnifiDriveConfigEntry) -> None:
     """Remove config-entry runtime mirrors after unload or setup failure."""
+    from .snapshot_entities import _clear_snapshot_target_entities_for_coordinator
+
+    coordinator = coordinator_from_entry_or_none(entry) or hass.data.get(
+        DOMAIN, {}
+    ).get(entry.entry_id)
+    if coordinator is not None:
+        _clear_snapshot_target_entities_for_coordinator(coordinator)
     entry.runtime_data = None
     hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
 
@@ -405,10 +406,9 @@ def _async_sync_device_registry_metadata(
         return False
 
     device_info = build_device_info(coordinator, entry, device_identifier)
-    updates: dict[str, object] = {}
-    for key in ("manufacturer", "model", "sw_version", "configuration_url"):
-        value = device_info.get(key)
-        if value and getattr(device_entry, key) != value:
+    updates: dict[str, str] = {}
+    for key, value in device_registry_metadata(device_info).items():
+        if getattr(device_entry, key) != value:
             updates[key] = value
 
     if not updates:

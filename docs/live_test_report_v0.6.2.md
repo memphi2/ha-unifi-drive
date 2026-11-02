@@ -1,5 +1,8 @@
 # v0.6.2 Live Test Report
 
+Historical report: these results apply to the versions and device below, not
+to the current development branch or Home Assistant release.
+
 This report records the live Home Assistant validation performed for the
 `v0.6.2` branch. It intentionally avoids local host addresses, usernames,
 passwords, tokens, MAC addresses, and snapshot target names.

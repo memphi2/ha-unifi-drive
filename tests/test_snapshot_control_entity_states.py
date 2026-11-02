@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-import sys
 from typing import Any
 from unittest.mock import patch
 
 import pytest
+
+from tests.ha_test_helpers import (
+    ROOT,
+    ensure_repo_custom_components_path as _ensure_repo_custom_components_path,
+)
 
 try:
     from homeassistant.const import (
@@ -30,34 +33,10 @@ except (ImportError, AttributeError):
     CONF_VERIFY_SSL = "verify_ssl"
 
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-CUSTOM_COMPONENTS = str(ROOT / "custom_components")
-
-
 @pytest.fixture
 def hass_config_dir() -> str:
     """Point Home Assistant at this repository's test config directory."""
     return str(ROOT)
-
-
-@pytest.fixture(autouse=True)
-def _enable_custom_integrations(enable_custom_integrations) -> None:
-    """Allow Home Assistant to load the integration from local custom components."""
-    _ensure_repo_custom_components_path()
-
-
-def _ensure_repo_custom_components_path() -> None:
-    """Keep Home Assistant loading this repository's integration path."""
-    import custom_components
-
-    if not hasattr(custom_components, "__path__"):
-        custom_components.__path__ = [str(ROOT / "custom_components")]
-
-    if CUSTOM_COMPONENTS not in custom_components.__path__:
-        custom_components.__path__.append(CUSTOM_COMPONENTS)
 
 
 def _entry_data(
@@ -268,6 +247,114 @@ class _SnapshotIntegrationClient:
         await self._maybe_fail()
         payload = {"target_key": snapshot_target_key(target), **kwargs}
         self.created.append(payload)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("language,suffix", [("en", "Snapshot limit"), ("de", "Snapshot-Limit")])
+async def test_snapshot_names_use_translations_and_preserve_registry_identity(hass, language, suffix):
+    """Target names are placeholders, while the control label is translated."""
+    from homeassistant.helpers import entity_registry as er
+
+    hass.config.language = language
+    client = _SnapshotIntegrationClient([_snapshot_target_with_controls()])
+    entry, controls = await _setup_snapshot_controls(hass, client)
+    entity_id = controls["limit"]
+    assert hass.states.get(entity_id).attributes["friendly_name"] == f"UNAS Team Drive {suffix}"
+    registry_entry = er.async_get(hass).async_get(entity_id)
+    assert registry_entry.unique_id == _snapshot_unique_ids(client.snapshot_settings[0], entry.unique_id)["limit"]
+    er.async_get(hass).async_update_entity(entity_id, name="Custom retention")
+    entry.runtime_data.async_set_updated_data(entry.runtime_data.data)
+    await hass.async_block_till_done()
+    assert er.async_get(hass).async_get(entity_id).name == "Custom retention"
+
+
+@pytest.mark.asyncio
+async def test_control_recorder_attributes_stay_stable_during_snapshot_count_changes(hass) -> None:
+    """Counter churn stays visible live without new control attribute blobs."""
+    from homeassistant.components.recorder.db_schema import StateAttributes
+    from homeassistant.const import EVENT_STATE_CHANGED
+    from homeassistant.core import Event
+
+    target = _snapshot_target_with_controls()
+    client = _SnapshotIntegrationClient([target])
+    entry, controls = await _setup_snapshot_controls(hass, client)
+
+    def recorded(entity_id):
+        return StateAttributes.shared_attrs_bytes_from_event(
+            Event(EVENT_STATE_CHANGED, {
+                "entity_id": entity_id, "old_state": None,
+                "new_state": hass.states.get(entity_id),
+            }), None,
+        )
+
+    before = {entity_id: recorded(entity_id) for entity_id in controls.values()}
+    for count in range(5, 25):
+        target.update(total_count=count, locked_count=count - 5)
+        entry.runtime_data.async_set_updated_data(entry.runtime_data.data)
+        await hass.async_block_till_done()
+        for entity_id in controls.values():
+            assert hass.states.get(entity_id).attributes["total_count"] == count
+            assert recorded(entity_id) == before[entity_id]
+    await hass.config_entries.async_unload(entry.entry_id)
+
+
+@pytest.mark.asyncio
+async def test_snapshot_recorder_omits_preview_but_keeps_live_attributes(hass) -> None:
+    """Real HA states retain previews while recorder serializes only useful history."""
+    import json
+
+    from homeassistant.components.recorder.db_schema import StateAttributes
+    from homeassistant.const import EVENT_STATE_CHANGED
+    from homeassistant.core import Event
+
+    from custom_components.unifi_unas.snapshot_types import snapshot_target_key
+
+    target = _snapshot_target_with_controls()
+    client = _SnapshotIntegrationClient([target])
+    entry, _ = await _setup_snapshot_controls(hass, client)
+    entity_id = next(
+        entity_id for uid, entity_id in _snapshot_entity_ids_by_unique_id(hass, entry).items()
+        if uid.endswith("_inventory")
+    )
+    coordinator = entry.runtime_data
+    key = snapshot_target_key(target)
+
+    def recorded(state):
+        return StateAttributes.shared_attrs_bytes_from_event(
+            Event(EVENT_STATE_CHANGED, {"entity_id": entity_id, "old_state": None, "new_state": state}),
+            None,
+        )
+
+    coordinator.snapshot_inventory[key] = {
+        "snapshot_count": 12, "snapshot_count_source": "inventory_total",
+        "snapshot_names": ["snapshot-a"], "recent_snapshots": [{"name": "snapshot-a"}],
+    }
+    coordinator.async_set_updated_data(coordinator.data)
+    await hass.async_block_till_done()
+    state = hass.states.get(entity_id)
+    assert state is not None and state.state == "12"
+    assert state.attributes["snapshot_names"] == ["snapshot-a"]
+    before = recorded(state)
+    assert "snapshot_names" not in json.loads(before)
+    assert "recent_snapshots" not in json.loads(before)
+    assert json.loads(before)["snapshot_count_source"] == "inventory_total"
+
+    coordinator.snapshot_inventory[key]["snapshot_names"] = ["snapshot-b"]
+    coordinator.snapshot_inventory[key]["recent_snapshots"] = [{"name": "snapshot-b"}]
+    coordinator.async_set_updated_data(coordinator.data)
+    await hass.async_block_till_done()
+    updated = hass.states.get(entity_id)
+    assert updated.attributes["snapshot_names"] == ["snapshot-b"]
+    assert recorded(updated) == before
+
+    changes = []
+    unsub = hass.bus.async_listen(EVENT_STATE_CHANGED, lambda event: changes.append(event))
+    try:
+        coordinator.async_set_updated_data(coordinator.data)
+        await hass.async_block_till_done()
+        assert not [event for event in changes if event.data["entity_id"] == entity_id]
+    finally:
+        unsub()
 
 
 @pytest.mark.asyncio

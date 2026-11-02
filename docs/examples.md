@@ -8,6 +8,10 @@ trigger:
   - platform: state
     entity_id: binary_sensor.unifi_unas_storage_problem
     to: "on"
+condition:
+  - condition: state
+    entity_id: binary_sensor.unifi_unas_device_online
+    state: "on"
 action:
   - service: notify.mobile_app_phone
     data:

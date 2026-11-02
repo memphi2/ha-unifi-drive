@@ -10,9 +10,18 @@ from typing import TYPE_CHECKING, Any, TypeVar
 from aiohttp import ClientConnectorError, ClientError, ClientResponse, ClientSession
 
 from .api_errors import CannotConnect, InvalidAuth, UnexpectedResponse
-from .security import safe_error_text
+from .security import safe_response_summary
 
 _T = TypeVar("_T")
+
+
+def reject_redirect(response: ClientResponse) -> None:
+    """Do not follow console redirects or treat them as successful writes."""
+    if 300 <= response.status < 400:
+        raise CannotConnect(
+            "The console redirected the request. Check the configured host, port "
+            "and SSL settings; automatic redirects are not permitted."
+        )
 
 
 class ApiTransportMixin:
@@ -92,7 +101,7 @@ class ApiTransportMixin:
         """Perform a JSON request against the local console."""
         data = await self._request(method, path, expect_json=True)
         if not isinstance(data, dict):
-            raise UnexpectedResponse(f"Expected JSON object from {path}")
+            raise UnexpectedResponse("Expected a JSON object from the console")
         return data
 
     async def _request_no_json(self, method: str, path: str) -> None:
@@ -113,8 +122,10 @@ class ApiTransportMixin:
                 self._url(path),
                 headers=self._headers(),
                 ssl=self._ssl,
+                allow_redirects=False,
             )
             async with response:
+                reject_redirect(response)
                 self._update_csrf_token(response)
 
                 if response.status in (401, 403):
@@ -123,8 +134,8 @@ class ApiTransportMixin:
                 if response.status >= 400:
                     body = await response.text()
                     raise CannotConnect(
-                        f"Request to {path} failed with HTTP {response.status}: "
-                        f"{safe_error_text(body)}"
+                        f"Console request failed with HTTP {response.status}: "
+                        f"{safe_response_summary(body)}"
                     )
 
                 if not expect_json:
@@ -136,7 +147,7 @@ class ApiTransportMixin:
                 except JSONDecodeError as err:
                     body = await response.text()
                     raise UnexpectedResponse(
-                        f"Expected JSON from {path}, got: {safe_error_text(body)}"
+                        f"Expected JSON from the console, got: {safe_response_summary(body)}"
                     ) from err
 
             return data if isinstance(data, dict) else None
@@ -158,8 +169,10 @@ class ApiTransportMixin:
                 headers=self._headers(),
                 json=json_body,
                 ssl=self._ssl,
+                allow_redirects=False,
             )
             async with response:
+                reject_redirect(response)
                 self._update_csrf_token(response)
                 status = response.status
 

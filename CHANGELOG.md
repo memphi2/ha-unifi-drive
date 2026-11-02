@@ -1,5 +1,51 @@
 # Changelog
 
+## v0.8.9 - Runtime hardening and performance maintenance
+
+- Stops snapshot write retries after ambiguous failures, rejects malformed target
+  lists and cleans runtime/listeners when setup is cancelled.
+- Bounds system/network metadata reads, omits duplicate snapshot control counts
+  from recorded attributes and translates dynamic entity labels without changing
+  existing unique IDs. Live-only attribute changes can still create state rows.
+- Removes raw payload keys and rejected private paths from audit/debug output;
+  adds repeated HA lifecycle and translation-placeholder regression coverage.
+- Hardens HTTP redirect boundaries and error privacy, and releases temporary
+  config-flow sessions after success, failure or cancellation.
+- Serializes snapshot settings updates against fresh target data and prevents
+  failed target reads from creating false missing-target repairs.
+- Bounds optional polling latency, shares pool/drive normalization within each
+  refresh and excludes large snapshot previews from recorded attributes.
+- Consolidates quality documentation, records outstanding rules honestly and
+  shares repository/archive/public-surface hygiene checks without new dependencies.
+- Requires final-head Code Review and CI evidence before release.
+- Updates the stable CI target to HA `2026.10.4` with matching test helper
+  `0.13.375`; keeps the HACS-advertised `2024.8.0` minimum covered.
+- Streamlines the README around features, options, setup and everyday use;
+  moves release/CI detail to the maintenance docs and keeps the Marketplace button.
+- Reads modern Home Assistant `DeviceInfo` through attributes while retaining
+  the older dictionary representation. Unset metadata preserves existing device
+  firmware/URLs, and unchanged metadata does not write the device registry.
+- Documents installation, updates and removal through Home Assistant Marketplace,
+  with HACS guidance for older HA versions and the existing pre-0.8.0 reinstall
+  requirement kept separate.
+- Adds the NAS/server catalog category without changing the integration domain,
+  advertised minimum HA version or runtime behavior.
+- Adds Marketplace as an installation method in support/bug forms and validates
+  the installation documentation, category and removed restore-state API guard.
+- Records the November HA compatibility follow-up and corrects the quality-scale
+  dependency comment: the discovery requirement is a minimum, not an exact pin.
+- Requires the complete validation workflow before release publication and
+  rejects tags that do not match the integration version.
+- Resolves the pinned HA runtime and test helper together and checks installed
+  dependencies instead of excluding the helper's Home Assistant requirement.
+- Bundles routine Action and pinned Python CI-tool updates quarterly, with one
+  open version-update PR per ecosystem. Security updates remain separate and
+  weekly compatibility checks continue unchanged.
+
+The release baseline is HA `2026.10.4`, with the advertised HA `2024.8.0` minimum
+also covered by CI. HA `2026.11` and Marketplace runtime validation remain a
+separate follow-up; this release does not claim that validation is complete.
+
 ## v0.8.8 - HA 2026.10 compatibility maintenance
 
 Patch development for the next `0.8.x` maintenance release:

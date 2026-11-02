@@ -2,37 +2,24 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-import sys
+import asyncio
+import gc
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
+from weakref import ref
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
-
-CUSTOM_COMPONENTS = str(ROOT / "custom_components")
-
-
-def _ensure_repo_custom_components_path() -> None:
-    """Keep Home Assistant's test package from shadowing this integration."""
-    import custom_components
-
-    if CUSTOM_COMPONENTS not in custom_components.__path__:
-        custom_components.__path__.append(CUSTOM_COMPONENTS)
+from tests.ha_test_helpers import (
+    ROOT,
+    ensure_repo_custom_components_path as _ensure_repo_custom_components_path,
+)
 
 
 @pytest.fixture
 def hass_config_dir() -> str:
     """Point Home Assistant at this repository's test config directory."""
     return str(ROOT)
-
-
-@pytest.fixture(autouse=True)
-def _enable_custom_integrations(enable_custom_integrations) -> None:
-    """Allow Home Assistant to load the integration from custom_components."""
 
 
 def _entry_data(*, wol_enabled: bool = False) -> dict[str, object]:
@@ -411,8 +398,63 @@ async def test_setup_and_unload_entry_stores_and_removes_coordinator(hass) -> No
 
 
 @pytest.mark.asyncio
+async def test_repeated_entry_lifecycle_releases_sessions_entities_and_coordinators(hass, monkeypatch):
+    """Real platform cycles must release owned resources, not just runtime mirrors."""
+    from aiohttp import ThreadedResolver
+    from homeassistant.helpers import aiohttp_client
+    from homeassistant.setup import async_setup_component
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.unifi_unas.const import (
+        DOMAIN, CONF_FAN_CONTROL_ENABLED, CONF_SNAPSHOT_BUTTONS_ENABLED,
+    )
+    from custom_components.unifi_unas.snapshot_entities import _SNAPSHOT_TARGET_ENTITIES
+    from tests.test_snapshot_control_entity_states import (
+        _SnapshotIntegrationClient, _snapshot_target_with_controls,
+    )
+
+    if hasattr(aiohttp_client, "AsyncResolver"):
+        monkeypatch.setattr(aiohttp_client, "AsyncResolver", ThreadedResolver)
+    assert await async_setup_component(hass, DOMAIN, {})
+    entry = MockConfigEntry(
+        domain=DOMAIN, title="UNAS", unique_id="cycle-device",
+        data={**_entry_data(), CONF_SNAPSHOT_BUTTONS_ENABLED: True, CONF_FAN_CONTROL_ENABLED: False},
+    )
+    entry.add_to_hass(hass)
+    sessions = []
+    coordinators = []
+    listener_counts = []
+
+    def create_client(session, **kwargs):
+        sessions.append(session)
+        return _SnapshotIntegrationClient([_snapshot_target_with_controls()])
+
+    with patch("custom_components.unifi_unas.UnifiUnasApiClient", side_effect=create_client):
+        for _ in range(10):
+            assert await hass.config_entries.async_setup(entry.entry_id)
+            await hass.async_block_till_done()
+            coordinator = entry.runtime_data
+            coordinators.append(ref(coordinator))
+            listener_counts.append(len(coordinator._listeners))
+            assert await hass.config_entries.async_unload(entry.entry_id)
+            await hass.async_block_till_done()
+            assert not coordinator._listeners
+            assert coordinator not in _SNAPSHOT_TARGET_ENTITIES
+            assert not entry.update_listeners
+            assert entry.entry_id not in hass.data.get(DOMAIN, {})
+            assert sessions[-1].closed
+            del coordinator
+    await hass.async_block_till_done()
+    gc.collect()
+    assert len(set(listener_counts)) == 1
+    assert all(item() is None for item in coordinators)
+    assert all(session.closed for session in sessions)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("error_type", [RuntimeError, asyncio.CancelledError])
 async def test_setup_entry_cleans_runtime_when_platform_forwarding_fails(
-    hass,
+    hass, error_type,
 ) -> None:
     """A failed platform setup should not leave stale runtime objects."""
     _ensure_repo_custom_components_path()
@@ -446,15 +488,17 @@ async def test_setup_entry_cleans_runtime_when_platform_forwarding_fails(
         ),
         patch(
             "homeassistant.config_entries.ConfigEntries.async_forward_entry_setups",
-            new=AsyncMock(side_effect=RuntimeError("forward setup failed")),
+            new=AsyncMock(side_effect=error_type("forward setup failed")),
         ),
     ):
-        with pytest.raises(RuntimeError, match="forward setup failed"):
-            await async_setup_entry(hass, entry)
-
-    assert entry.entry_id not in hass.data.get(DOMAIN, {})
-    assert getattr(entry, "runtime_data", None) is None
-    remove_snapshot_cleanup_listener.assert_called_once()
+        for _ in range(20):
+            with pytest.raises(error_type, match="forward setup failed"):
+                await async_setup_entry(hass, entry)
+            await entry._async_process_on_unload(hass)
+            assert entry.entry_id not in hass.data.get(DOMAIN, {})
+            assert getattr(entry, "runtime_data", None) is None
+            assert not entry.update_listeners
+    assert remove_snapshot_cleanup_listener.call_count == 20
 
 
 @pytest.mark.asyncio
@@ -575,6 +619,51 @@ def test_device_registry_metadata_sync_updates_firmware_version(hass) -> None:
     assert updated is not None
     assert updated.sw_version == "5.1.10"
     assert updated.model == "UNAS2W"
+
+    with patch.object(
+        device_registry, "async_update_device", wraps=device_registry.async_update_device
+    ) as update:
+        assert _async_sync_device_registry_metadata(hass, entry, coordinator) is False
+    update.assert_not_called()
+
+
+@pytest.mark.parametrize("representation", ("native", "legacy"))
+def test_device_registry_metadata_sync_preserves_unset_fields(
+    hass, representation: str
+) -> None:
+    """Unset firmware/URL fields must not erase metadata or write the registry."""
+    _ensure_repo_custom_components_path()
+    from homeassistant.helpers import device_registry as dr
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+    from custom_components.unifi_unas import _async_sync_device_registry_metadata
+    from custom_components.unifi_unas.const import DOMAIN
+
+    entry = MockConfigEntry(domain=DOMAIN, unique_id="system-id", data=_entry_data())
+    entry.add_to_hass(hass)
+    registry = dr.async_get(hass)
+    device = registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, "system-id")},
+        manufacturer="Ubiquiti",
+        model="UNAS2W",
+        sw_version="5.1.10",
+        configuration_url="https://unas.example",
+    )
+    factory = dr.DeviceInfo if representation == "native" else dict
+    info = factory(manufacturer="Ubiquiti", model="UNAS2W")
+
+    with (
+        patch("custom_components.unifi_unas.build_device_info", return_value=info),
+        patch.object(registry, "async_update_device", wraps=registry.async_update_device)
+        as update,
+    ):
+        assert _async_sync_device_registry_metadata(hass, entry, SimpleNamespace()) is False
+
+    update.assert_not_called()
+    assert registry.async_get(device.id) is device
+    assert device.sw_version == "5.1.10"
+    assert device.configuration_url == "https://unas.example"
 
 
 def test_device_registry_metadata_tracking_registers_refresh_listener(hass) -> None:
