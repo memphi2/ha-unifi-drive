@@ -9,6 +9,7 @@ import sys
 import pytest
 
 HA_BACKED_TEST_FILES = {
+    "test_runtime_soak.py",
     "test_recorder_runtime.py",
     "test_api_http_safety.py",
     "test_config_flow_sessions.py",
