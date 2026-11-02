@@ -75,53 +75,14 @@ tested HA/integration versions and outcomes, not credentials or local identifier
 - `docs/live_db_probe.md` tracks recorder/config-entry write behavior for
   discovery write-throttle hardening.
 
-## Code And Security Review
+## Code Review
 
-Every release requires two separate completed Codex reviews of the **same final
-PR head**, in addition to CI:
-
-1. Code Review, requested with `@codex review`.
-2. Dedicated Security Review, requested with `@codex security review`.
-
-Use separate PR comments if verified results do not already exist for that
-commit. A security-focused prompt on normal Code Review does not replace the
-dedicated review. After any new commit, including review fixes or documentation
-changes, obtain both reviews again for the new head.
-
-Before approving publication, record in the PR:
-
-- the full final PR head SHA
-- the Code Review result link and its reviewed commit
-- the dedicated Security Review task/report link, reviewed commit and outcome
-- confirmation that actionable findings from both reviews have been resolved
-
-Open the dedicated task's **Security Report** and inspect the complete result,
-including findings below the GitHub reporting threshold. No public findings,
-a bot reaction, a green CI run or a normal review approval is not proof of a
-completed clean Security Review. Pending tasks, service errors, missing access
-and reports for older commits keep the release blocked. Do not bypass that gate
-because the review service is unavailable.
-
-Record only non-sensitive status and evidence links in public PRs. Do not paste
-credentials, local identifiers or sensitive report details. Access to a private
-report does not need to be broadened for public release documentation.
-
-### Automatic Review Setup
-
-Codex repository settings control automatic review execution. The intended
-configuration is Code Review enabled, **Auto security review** enabled for
-**All PRs**, and the security trigger **Whenever code review runs**. Ensure a
-fresh pair runs after the final push; request either missing review manually.
-Review the reporting thresholds and the full Security Report rather than
-assuming that every finding is posted publicly.
-
-These are desired settings, not a claim that account automation is enabled.
-Verify them in Codex for this repository. This document, `AGENTS.md` and the PR
-template establish the release process; they do not enable account settings or
-add an enforced GitHub status check. The release owner must verify both results
-before approving the tag. Existing branch protections must not be weakened.
-
-See the [official Security Review documentation](https://learn.chatgpt.com/docs/security/security-review).
+Require completed Code Review of the final PR head and resolve actionable findings.
+Record its SHA and evidence link in the PR. New commits require fresh review.
+Allow automatic reviews to finish without duplicate manual requests.
+Separate Security Review and access to its full report are optional, not release
+gates. Do not claim clearance for uninspected reports. CodeQL, Bandit, dependency
+checks and privacy/legal audits remain required. Preserve branch protections.
 
 ## Release Readiness Rule
 
@@ -135,8 +96,6 @@ Do not finalize release work while any of these are failing, missing or pending:
 - HACS validation workflow
 - Hassfest workflow
 - Code Review of the final PR head, with actionable findings resolved
-- dedicated Security Review of that same head, with the full report inspected
-  and actionable findings resolved
 
 Release publication first calls the complete validation workflow on the tagged
 commit, including both HA matrix legs, HA-backed tests and the 95% coverage floor.

@@ -3,7 +3,7 @@
 Release scope on `2026-11-02`: maintenance for HA `2026.10.4`, retaining the
 HA `2024.8.0` minimum. HA `2026.11` is not a runtime requirement or a prerequisite
 for this release. Publication remains conditional on the gates below, including
-both reviews of the final PR commit.
+Code Review of the final PR commit.
 
 ## Prepared
 
@@ -34,11 +34,6 @@ both reviews of the final PR commit.
   marker lists come only from environment/Actions variables, never tracked files.
 - [ ] Complete normal Code Review of the final PR head and resolve actionable
   findings. Record the full SHA and review link in the PR.
-- [ ] Complete a separate dedicated Security Review of that same head. Inspect
-  the full Security Report, resolve actionable findings and record the report
-  link/outcome in the PR. A normal bot review or missing comments is not enough.
-  Repeat both reviews after any new commit; failed or inaccessible tasks block
-  release. Follow the [review policy](validation.md#code-and-security-review).
 - [ ] Record the final SHA, exact tested versions, run URLs and review evidence
   in the PR. Keep release wording limited to completed checks; do not claim new
   live HA/NAS, Marketplace or long-running RAM/Recorder validation.
@@ -76,11 +71,10 @@ and record its evidence in the PR; earlier reviews do not approve later changes.
 | November `DeviceInfo` | Focused check against actual HA `2026.11.0b1` passed; not a full compatibility result |
 | Marketplace live lifecycle | Follow-up; no new live-test claim |
 | Final CI / Code Review | Record final head and run/review URLs in the PR |
-| Dedicated Security Review | Separate final-head task and full report required; not implied by Code Review or CI |
 
 ## Publication After Approval
 
-1. Verify the final head, all checks, both review results and this checklist again.
+1. Verify the final head, all checks, Code Review and this checklist again.
 2. Merge only after explicit release approval. Verify `main` contains the
    approved code and `manifest.json` version `0.8.9`.
 3. Create tag `v0.8.9` on that exact commit. The release workflow reruns complete

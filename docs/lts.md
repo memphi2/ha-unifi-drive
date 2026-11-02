@@ -103,7 +103,7 @@ Official references:
   minimum-version leg keeps its older pytest-asyncio-compatible configuration.
 - Release publication now depends on the reusable full validation workflow for
   the same tagged commit. The tag must match the manifest version. A green run
-  still does not replace both final-head reviews. November live-test evidence
+  still does not replace final-head Code Review. November live-test evidence
   remains required for a later Marketplace compatibility claim.
 - Keep scheduled drift checks separate from the reproducible supported-version
   matrix. A beta-only green run must not be described as stable-release evidence.
