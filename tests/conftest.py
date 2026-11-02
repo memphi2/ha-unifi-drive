@@ -9,6 +9,7 @@ import sys
 import pytest
 
 HA_BACKED_TEST_FILES = {
+    "test_flow_manager_paths.py",
     "test_card_contract.py",
     "test_fake_unas_server.py",
     "test_runtime_soak.py",

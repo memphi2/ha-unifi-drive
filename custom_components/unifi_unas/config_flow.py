@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from collections.abc import Mapping
 from dataclasses import dataclass
 import logging
-from typing import Any, TypeAlias
+from typing import Any, TypeAlias, cast
 
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
@@ -326,6 +326,34 @@ class UnifiUnasConfigFlow(
     """Handle a config flow for UniFi Drive."""
 
     VERSION = 1
+
+    # These flow conveniences are absent on the supported HA 2024.8 baseline.
+    if not hasattr(config_entries.ConfigFlow, "_get_reauth_entry"):
+        def _get_reauth_entry(self) -> UnifiDriveConfigEntry:
+            entry = self.hass.config_entries.async_get_entry(self.context["entry_id"])
+            if entry is None:
+                raise ValueError("The config entry no longer exists")
+            return cast(UnifiDriveConfigEntry, entry)
+
+        def _get_reconfigure_entry(self) -> UnifiDriveConfigEntry:
+            return self._get_reauth_entry()
+
+        def _abort_if_unique_id_mismatch(self, *, reason: str) -> None:
+            from homeassistant.data_entry_flow import AbortFlow
+
+            if self._get_reauth_entry().unique_id != self.unique_id:
+                raise AbortFlow(reason)
+
+    if not hasattr(config_entries.ConfigFlow, "async_update_and_abort"):
+        def async_update_and_abort(
+            self,
+            entry: UnifiDriveConfigEntry,
+            *,
+            data: dict[str, Any],
+            options: dict[str, Any],
+        ) -> ConfigFlowResult:
+            self.hass.config_entries.async_update_entry(entry, data=data, options=options)
+            return self.async_abort(reason=f"{self.context['source']}_successful")
 
     def __init__(self) -> None:
         """Initialize config-flow discovery state."""

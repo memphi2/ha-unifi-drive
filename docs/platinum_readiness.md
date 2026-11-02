@@ -32,6 +32,11 @@ Rule references: [flow coverage](https://contributors.home-assistant.io/core/qua
 
 ## Regression Evidence
 
+- Real HA flow-manager tests cover validation failure/retry, aborted setup,
+  identity rejection during reauth/reconfigure, option validation, single reload
+  and repair deduplication/recovery on both supported CI baselines. Older HA uses
+  small compatibility fallbacks for flow helpers introduced after 2024.8.
+
 - Ambiguous snapshot write errors stop immediately; only HTTP 404/405 permits
   endpoint fallback. No destructive snapshot action has been added.
 - Malformed or partial snapshot settings preserve cached targets rather than
