@@ -249,3 +249,9 @@ def test_device_info_uses_default_model_without_system_payload() -> None:
     assert info["model"] == "UniFi Drive / UNAS"
     assert "sw_version" not in info
     assert info["configuration_url"] is None
+
+
+def test_device_info_rejects_non_text_configuration_url() -> None:
+    coordinator = types.SimpleNamespace(client=types.SimpleNamespace(base_url=object()), data={})
+    info = device_module.build_device_info(coordinator, _FakeEntry(), "synthetic-device")
+    assert info["configuration_url"] is None

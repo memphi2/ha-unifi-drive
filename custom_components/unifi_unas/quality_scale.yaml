@@ -13,7 +13,7 @@ rules:
     comment: API, discovery, diagnostics, storage, snapshot and entity helpers are split.
   config-flow-test-coverage:
     status: todo
-    comment: Helpers and critical HA setup paths are covered; complete HA-driven coverage of all flow branches remains open.
+    comment: Real HA flow-manager tests cover setup failure/retry/abort, options, reauth/reconfigure identity guards and reloads on both CI baselines. Complete HA-driven coverage of every flow branch remains open.
   config-flow:
     status: done
     comment: Setup, discovery, reauth and reconfigure are UI-driven.
@@ -163,4 +163,4 @@ rules:
     comment: The local API client receives a Home Assistant-created aiohttp session.
   strict-typing:
     status: todo
-    comment: Every integration module is covered by strict mypy with an omission guard. Any payload and HA boundaries, follow_imports=skip and targeted base-class ignores remain; complete imported-type correctness is not yet claimed.
+    comment: Every integration module is covered by strict mypy with an omission guard. A separate imported-HA gate checks runtime, entry and device metadata boundaries on both CI baselines without skipped imports. Any payload boundaries and base-class ignores remain elsewhere; complete imported-type correctness is not claimed.

@@ -42,6 +42,7 @@ Run when the environment provides the tooling:
 ```bash
 python -m ruff check custom_components tests scripts
 mypy --config-file mypy.ini
+mypy --config-file mypy-ha.ini
 python -m bandit -q -r custom_components scripts
 ```
 
@@ -58,6 +59,8 @@ python -m bandit -q -r custom_components scripts
 - quality-scale status validation
 - translation structure validation
 - typed runtime-data baseline and strict mypy gate structure
+- an additional imported-HA type gate for runtime, read-only entry and device
+  metadata contracts, run against each matrix environment's actual HA types
 - icon/exception translation baseline
 - full integration unit/fixture test suite
 

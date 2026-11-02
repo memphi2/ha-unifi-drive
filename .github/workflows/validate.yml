@@ -96,7 +96,9 @@ jobs:
         run: ruff check custom_components tests scripts
 
       - name: Run typing checks
-        run: mypy --config-file mypy.ini
+        run: |
+          mypy --config-file mypy.ini
+          mypy --config-file mypy-ha.ini
 
       - name: Run security checks
         run: bandit -q -r custom_components scripts

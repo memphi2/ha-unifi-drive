@@ -9,8 +9,11 @@ from typing import Any, Protocol
 class ConfigEntryLike(Protocol):
     """Config-entry shape needed by data/options helpers."""
 
-    data: Mapping[str, Any]
-    options: Mapping[str, Any]
+    @property
+    def data(self) -> Mapping[str, Any]: ...
+
+    @property
+    def options(self) -> Mapping[str, Any]: ...
 
 FEATURE_OPTION_KEYS: tuple[str, ...] = (
     "scan_interval",

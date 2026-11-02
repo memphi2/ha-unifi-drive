@@ -1128,6 +1128,27 @@ def _entity_translation_keys() -> dict[str, set[str]]:
     return result
 
 
+def check_imported_ha_typing_gate() -> None:
+    """Keep selected HA boundaries checked against real imported types."""
+    path = ROOT / "mypy-ha.ini"
+    ensure_file(path)
+    parser = configparser.ConfigParser()
+    parser.read(path, encoding="utf-8")
+    required = {"strict": "true", "follow_imports": "silent",
+                "disallow_any_unimported": "true", "disallow_any_expr": "true"}
+    for key, expected in required.items():
+        if parser.get("mypy", key, fallback="").strip().lower() != expected:
+            fail(f"mypy-ha.ini must set {key} = {expected}")
+    files = {item.strip() for item in parser.get("mypy", "files", fallback="").split(",")}
+    if not {"scripts/typecheck_ha_contract.py", "custom_components/unifi_unas/device.py"} <= files:
+        fail("Imported HA typing gate must include the contract and device metadata builder")
+    for name in files:
+        ensure_file(ROOT / name)
+    if "mypy --config-file mypy-ha.ini" not in VALIDATE_WORKFLOW_PATH.read_text(encoding="utf-8"):
+        fail("Validate workflow must run the imported HA typing gate")
+    ok("Imported HA boundary typing gate validated")
+
+
 def main() -> None:
     """Run all checks."""
     ensure_file(README_PATH)
@@ -1169,6 +1190,7 @@ def main() -> None:
     check_release_validation_gate()
     check_parallel_updates_rule()
     check_strict_typing_foundation()
+    check_imported_ha_typing_gate()
     check_exception_translations()
     check_icon_translations()
     check_python_compile()
