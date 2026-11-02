@@ -9,7 +9,6 @@ Additional regression commands and their scope:
 
 - [Recorder measurements and history profiles](recorder.md)
 - [Bounded RAM/task lifecycle measurements](runtime_measurements.md)
-- [Real integration/card entity contract](card_contract.md)
 
 Verify a committed candidate locally with `python scripts/release_check.py`.
 After publication, verify the exact approved tag, release notes and downloaded

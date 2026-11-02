@@ -53,8 +53,6 @@ Rule references: [flow coverage](https://contributors.home-assistant.io/core/qua
   objects after warmup across setup/recovery/unload cycles. It is not a live soak.
 - Stateful loopback HTTP tests cover cookie sessions, expiry, reauthentication,
   malformed data, optional endpoint failures, timeouts and recovery.
-- The companion-card contract can be checked against freshly exported real HA
-  registry/entity data from synthetic integration setup, not hand-built states.
 
 ## Recommended Work Order
 

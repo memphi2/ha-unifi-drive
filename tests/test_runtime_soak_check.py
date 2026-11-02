@@ -37,3 +37,20 @@ def test_steady_check_rejects_registry_growth_and_stale_inventory():
     data[-1]["inventory_entries"] = 2
     assert steady_errors(data)
     assert steady_errors([])
+
+
+def test_extended_ci_retains_resource_measurements_without_external_checkout():
+    from pathlib import Path
+    import yaml
+
+    root = Path(__file__).resolve().parents[1]
+    workflow = yaml.safe_load((root / ".github/workflows/validate.yml").read_text())
+    steps = workflow["jobs"]["repository_checks"]["steps"]
+    for label in ("Measure extended runtime resources", "Retain synthetic runtime evidence"):
+        step = next(step for step in steps if step["name"] == label)
+        assert "schedule" in step["if"] and "workflow_dispatch" in step["if"]
+    upload = steps[-1]
+    assert upload["with"]["retention-days"] == 14
+    assert upload["with"]["if-no-files-found"] == "error"
+    assert upload["with"]["path"] == "${{ runner.temp }}/unas-soak.json"
+    assert not any(step.get("with", {}).get("repository") for step in steps)
