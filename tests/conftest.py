@@ -9,6 +9,7 @@ import sys
 import pytest
 
 HA_BACKED_TEST_FILES = {
+    "test_recorder_runtime.py",
     "test_api_http_safety.py",
     "test_config_flow_sessions.py",
     "test_control_entity_states.py",
@@ -41,6 +42,8 @@ def _prepare_ha_integration_namespace(request: pytest.FixtureRequest) -> None:
         return
     if find_spec("pytest_homeassistant_custom_component") is None:
         return
+    if request.node.path.name == "test_recorder_runtime.py":
+        request.getfixturevalue("recorder_db_url")
     request.getfixturevalue("enable_custom_integrations")
     from tests.ha_test_helpers import ensure_repo_custom_components_path
 
