@@ -15,10 +15,11 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--card-root", required=True, type=Path)
+    parser.add_argument("--json-output", type=Path, help="retain the synthetic export for CI evidence")
     args = parser.parse_args()
     card = args.card_root.resolve()
-    if not (card / "test/real-integration-contract.test.ts").is_file():
-        parser.error("card checkout must contain the real integration contract test")
+    if not (card / "test").is_dir() or not (card / "src/discovery.ts").is_file():
+        parser.error("expected a companion-card source checkout")
     npm = shutil.which("npm")
     if npm is None:
         parser.error("npm is required for companion-card tests")
@@ -33,10 +34,19 @@ def main():
         if not output.is_file():
             print("FAIL: HA entity export did not run")
             return 1
-        # resolved tool, fixed arguments.
-        return subprocess.run([npm, "test", "--", "test/real-integration-contract.test.ts"],  # nosec B603
-                              cwd=card, env={**os.environ, "UNAS_CARD_CONTRACT_FIXTURE": str(output)},
-                              check=False).returncode
+        if args.json_output:
+            shutil.copyfile(output, args.json_output)
+        # Exclusive creation prevents overwriting a developer's existing test.
+        test = card / "test/unas-generated-contract.test.ts"
+        with test.open("x") as target:
+            target.write((ROOT / "scripts/card_contract.test.ts").read_text())
+        try:
+            # resolved tool, fixed arguments.
+            return subprocess.run([npm, "test", "--", f"test/{test.name}"],  # nosec B603
+                                  cwd=card, env={**os.environ, "UNAS_CARD_CONTRACT_FIXTURE": str(output)},
+                                  check=False).returncode
+        finally:
+            test.unlink()
 
 
 if __name__ == "__main__":
