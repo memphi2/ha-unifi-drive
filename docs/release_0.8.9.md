@@ -1,8 +1,9 @@
 # v0.8.9 Release Checklist
 
-Status on `2026-11-01`: prepared for review, **not approved for publication**.
-Do not tag, merge for release or publish automatically when HA `2026.11` appears.
-The release owner must complete the gates below on the final PR commit.
+Release scope on `2026-11-02`: maintenance for HA `2026.10.4`, retaining the
+HA `2024.8.0` minimum. HA `2026.11` is not a runtime requirement or a prerequisite
+for this release. Publication remains conditional on the gates below, including
+both reviews of the final PR commit.
 
 ## Prepared
 
@@ -19,23 +20,16 @@ The release owner must complete the gates below on the final PR commit.
 
 ## Required Before Release
 
-- [ ] HA `2026.11` has a stable release, not only a beta or release candidate.
-- [ ] Select a published `pytest-homeassistant-custom-component` version whose
-  declared HA dependency matches that exact stable runtime. Do not guess a
-  version, ignore dependencies or reuse October fixtures as November evidence.
-- [ ] Update the current HA/helper pair in `.github/workflows/validate.yml`,
-  `CURRENT_HOMEASSISTANT_TARGET` / `CURRENT_PYTEST_HOMEASSISTANT` in
-  `scripts/check_repo.py`, their tests and the compatibility summary in `docs/lts.md`.
-  Keep the HA `2024.8.0` / Python `3.12` leg and Python `3.14` for November.
+- [ ] Validate the pinned HA `2026.10.4` / Python `3.14` / helper `0.13.375`
+  baseline and HA `2024.8.0` / Python `3.12` / helper `0.13.152` minimum.
+  Resolve each helper's exact HA dependency normally; do not bypass dependencies.
 - [ ] Dependency checks, HACS, Hassfest, Ruff, Mypy, Bandit, full pytest, at least
   95% coverage, compileall and whitespace checks pass for the final PR commit.
   Confirm the HA-backed tests actually ran; a helper-only run is insufficient.
-- [ ] On a separately authorized test HA, record fresh Marketplace installation,
-  existing HACS takeover, update/restart, reload, reauth, reconfigure, offline
-  recovery and removal. Preserve config-entry/device/entity identities on
-  supported in-place updates. See [validation.md](validation.md).
-- [ ] Confirm firmware remains visible after fresh setup, refresh and recovery;
-  missing firmware does not erase it. Check for duplicate devices and entities.
+- [ ] Confirm the regression suite covers firmware after fresh setup, refresh
+  and recovery, preservation of missing metadata, stable entity identities,
+  repeated setup/unload and offline recovery on the supported HA baseline.
+  Report automated results separately from live-device evidence.
 - [ ] Run the public GitHub and packaged ZIP privacy/legal checks. Personal
   marker lists come only from environment/Actions variables, never tracked files.
 - [ ] Complete normal Code Review of the final PR head and resolve actionable
@@ -45,24 +39,42 @@ The release owner must complete the gates below on the final PR commit.
   link/outcome in the PR. A normal bot review or missing comments is not enough.
   Repeat both reviews after any new commit; failed or inaccessible tasks block
   release. Follow the [review policy](validation.md#code-and-security-review).
-- [ ] Record the exact tested versions, run URLs and anonymized live outcomes
-  below. Update release wording to reflect only completed checks and remove
-  stale preparation notices from the changelog when approving publication.
+- [ ] Record the final SHA, exact tested versions, run URLs and review evidence
+  in the PR. Keep release wording limited to completed checks; do not claim new
+  live HA/NAS, Marketplace or long-running RAM/Recorder validation.
+
+## Later HA 2026.11 And Marketplace Validation
+
+These checks are required before declaring the newer runtime and Marketplace
+lifecycle validated. They do not block the HA `2026.10.4` maintenance release.
+
+- [ ] Select stable HA `2026.11` and a published helper with a matching exact
+  dependency. Do not reuse October fixtures or beta-only results as evidence.
+- [ ] Update the HA/helper pair in `.github/workflows/validate.yml`, the matching
+  targets in `scripts/check_repo.py`, their tests and `docs/lts.md` together.
+  Retain the HA `2024.8.0` / Python `3.12` minimum leg and run every quality gate.
+- [ ] On a separately authorized test HA, record fresh Marketplace installation,
+  existing HACS takeover, update/restart, reload, reauth, reconfigure, offline
+  recovery and removal. Preserve config-entry/device/entity identities on
+  supported in-place updates. See [validation.md](validation.md).
+- [ ] Confirm firmware after fresh setup, refresh and recovery, preservation of
+  missing metadata and absence of duplicate devices/entities in that live run.
+- [ ] Record anonymized versions and outcomes before making compatibility claims.
 
 ## Evidence
 
-The numeric results below describe preparation commit `b79a499`, before the
-subsequent local hardening commits. Rerun all gates for the final release head;
-these historical results and earlier bot reviews do not approve later changes.
+The numeric results below describe preparation commit `a03ae5a`, before the
+release-scope documentation update. Rerun all gates for the final release head
+and record its evidence in the PR; earlier reviews do not approve later changes.
 
 | Gate | Evidence |
 | --- | --- |
-| HA 2024.8.0 / Python 3.12.13 / helper 0.13.152 | 571 tests passed, no skips; coverage 95.18%; `pip check`, Ruff, Mypy, Bandit and compileall passed with the pinned CI tools |
-| HA 2026.10.4 / Python 3.14.4 / helper 0.13.375 | 571 tests passed, no skips; coverage 95.72%; `pip check`, Ruff, Mypy, Bandit, repository checks and compileall passed with the pinned CI tools |
+| HA 2024.8.0 / Python 3.12.13 / helper 0.13.152 | 702 tests passed, no skips; coverage 95.33%; `pip check`, Ruff, Mypy, Bandit and compileall passed with the pinned CI tools |
+| HA 2026.10.4 / Python 3.14.4 / helper 0.13.375 | 702 tests passed, no skips; coverage 95.85%; `pip check`, Ruff, Mypy, Bandit, repository checks and compileall passed with the pinned CI tools |
 | Public surfaces and archive | Existing public GitHub surfaces and locally built release ZIP passed the automated privacy/legal/layout audit |
-| Stable HA 2026.11 / matching test helper | Pending upstream release and full test run |
+| Stable HA 2026.11 / matching test helper | Follow-up; not claimed by this maintenance release |
 | November `DeviceInfo` | Focused check against actual HA `2026.11.0b1` passed; not a full compatibility result |
-| Marketplace live lifecycle | Pending; no new live-test claim |
+| Marketplace live lifecycle | Follow-up; no new live-test claim |
 | Final CI / Code Review | Record final head and run/review URLs in the PR |
 | Dedicated Security Review | Separate final-head task and full report required; not implied by Code Review or CI |
 

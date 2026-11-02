@@ -67,9 +67,11 @@ declares an exact dependency on HA `2026.10.4`; it is not suitable as a November
 test baseline. Marketplace documentation and catalog metadata alone do not prove
 runtime compatibility with the November release.
 
-The `v0.8.9` [release checklist](release_0.8.9.md) tracks the remaining gates.
-Release notes are prepared, but no November stable compatibility claim or live
-Marketplace test result is implied.
+The `v0.8.9` [release checklist](release_0.8.9.md) targets a maintenance release
+on HA `2026.10.4`, retaining the tested `2024.8.0` minimum. It does not require
+November to ship. The following gates remain required before claiming HA
+`2026.11` or Marketplace runtime validation; no completed live Marketplace test
+result is implied.
 
 | Area | Current status | Required follow-up |
 | --- | --- | --- |
@@ -101,7 +103,8 @@ Official references:
   minimum-version leg keeps its older pytest-asyncio-compatible configuration.
 - Release publication now depends on the reusable full validation workflow for
   the same tagged commit. The tag must match the manifest version. A green run
-  still does not replace bot review or the required November live-test evidence.
+  still does not replace both final-head reviews. November live-test evidence
+  remains required for a later Marketplace compatibility claim.
 - Keep scheduled drift checks separate from the reproducible supported-version
   matrix. A beta-only green run must not be described as stable-release evidence.
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.8.9 - HA 2026.11 and Marketplace preparation
+## v0.8.9 - Runtime hardening and performance maintenance
 
 - Stops snapshot write retries after ambiguous failures, rejects malformed target
   lists and cleans runtime/listeners when setup is cancelled.
@@ -43,8 +43,9 @@
   open version-update PR per ecosystem. Security updates remain separate and
   weekly compatibility checks continue unchanged.
 
-Release is held until the final HA `2026.11` compatibility and Marketplace checks
-in [the release checklist](docs/release_0.8.9.md) are complete.
+The release baseline is HA `2026.10.4`, with the advertised HA `2024.8.0` minimum
+also covered by CI. HA `2026.11` and Marketplace runtime validation remain a
+separate follow-up; this release does not claim that validation is complete.
 
 ## v0.8.8 - HA 2026.10 compatibility maintenance
 

@@ -149,8 +149,11 @@ merging, verify the release contains the reviewed content and no additional
 changes; changed content requires fresh review before publication. A clean review
 does not grant permission to merge, tag or publish without explicit approval.
 
-The pending November release has a separate [v0.8.9 checklist](release_0.8.9.md).
-Do not treat beta smoke tests as proof of stable HA or Marketplace compatibility.
+The HA `2026.10.4` maintenance release has a separate
+[v0.8.9 checklist](release_0.8.9.md). HA `2026.11` and Marketplace lifecycle
+validation are follow-up gates for claiming that compatibility, not prerequisites
+for this release on the tested HA baseline. Do not treat beta smoke tests as proof
+of stable HA or Marketplace compatibility.
 
 Release publication also runs `scripts/check_repo.py` before building the ZIP and
 `scripts/check_release_zip.py` before uploading the release asset. It also runs

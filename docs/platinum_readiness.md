@@ -57,7 +57,8 @@ Rule references: [flow coverage](https://contributors.home-assistant.io/core/qua
 
 [Validation](validation.md) defines the full local and CI gates, plus independent
 final-head Code Review and Security Review. The [release checklist](release_0.8.9.md)
-tracks November compatibility and Marketplace lifecycle checks. No live HA/NAS
+targets the tested HA `2026.10.4` maintenance baseline and separately tracks
+November compatibility and Marketplace lifecycle follow-up checks. No live HA/NAS
 validation is implied by local synthetic tests.
 
 Historical evidence remains in the [v0.6.2 live report](live_test_report_v0.6.2.md)
