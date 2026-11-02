@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from json import JSONDecodeError
+from json import JSONDecodeError, loads
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from aiohttp import ClientResponse, ClientSession
 
 from .api_errors import CannotConnect, InvalidAuth
-from .api_transport import reject_redirect
+from .api_transport import read_response_body, read_response_text, reject_redirect
 from .const import LOGIN_PATH
 from .security import safe_response_summary
 from .wake_on_lan import normalize_mac_address
@@ -253,7 +253,7 @@ class ApiAuthMixin:
             )
             async with response:
                 self._update_csrf_token(response)
-                await response.read()
+                await read_response_body(response)
 
         await self._request_with_timeout(_read_root)
 
@@ -269,15 +269,15 @@ class ApiAuthMixin:
             raise InvalidAuth("Invalid UniFi username or password")
 
         if response.status >= 400:
-            body = await response.text()
+            body = await read_response_text(response)
             raise CannotConnect(
                 f"Login failed with HTTP {response.status}: {safe_response_summary(body)}"
             )
 
+        body = await read_response_text(response)
         try:
-            data = await response.json(content_type=None)
+            data = loads(body)
         except JSONDecodeError:
-            await response.read()
             return None
 
         return data if isinstance(data, dict) else None

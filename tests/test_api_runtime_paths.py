@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from json import JSONDecodeError
+from json import JSONDecodeError, dumps
 from typing import Any
 
 import pytest
@@ -56,6 +56,12 @@ class _Response:
         self.headers = _Headers(headers or {})
         self._json_error = json_error
         self.read_called = False
+        self.charset = None
+        self.content = self
+        self._body = (text if text is not None else dumps(payload)).encode()
+
+    def close(self):
+        self._body = b""
 
     async def __aenter__(self) -> "_Response":
         return self
@@ -73,9 +79,12 @@ class _Response:
             return self._text
         return str(self._payload)
 
-    async def read(self) -> bytes:
+    async def read(self, size: int = -1) -> bytes:
         self.read_called = True
-        return (self._text or "").encode()
+        if size < 0:
+            size = len(self._body)
+        chunk, self._body = self._body[:size], self._body[size:]
+        return chunk
 
 
 class _Session:

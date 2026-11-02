@@ -1,5 +1,10 @@
 # Runtime Resource Measurements
 
+HTTP bodies are read in bounded chunks with an 8 MiB decompressed-body limit,
+including login, error replies and chunked responses. Oversized responses fail
+without including their content in the error. This bounds the integration's
+body accumulator, not total process RSS or aiohttp's decompression buffers.
+
 The normal suite runs a short synthetic HA lifecycle measurement. For a longer
 run in the same HA test environment:
 

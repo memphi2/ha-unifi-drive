@@ -13,6 +13,27 @@ from .api_errors import CannotConnect, InvalidAuth, UnexpectedResponse
 from .security import safe_response_summary
 
 _T = TypeVar("_T")
+MAX_RESPONSE_BYTES = 8 * 1024 * 1024
+
+
+async def read_response_body(response: ClientResponse) -> bytes:
+    """Bound decompressed bodies, including chunked and misleading-length replies."""
+    body = bytearray()
+    while chunk := await response.content.read(min(65536, MAX_RESPONSE_BYTES + 1 - len(body))):
+        body.extend(chunk)
+        if len(body) > MAX_RESPONSE_BYTES:
+            response.close()
+            raise UnexpectedResponse("Console response exceeds the 8 MiB safety limit")
+    return bytes(body)
+
+
+async def read_response_text(response: ClientResponse) -> str:
+    """Decode a bounded response without exposing raw content in errors."""
+    body = await read_response_body(response)
+    try:
+        return body.decode(response.charset or "utf-8", errors="replace")
+    except LookupError:
+        return body.decode("utf-8", errors="replace")
 
 
 def reject_redirect(response: ClientResponse) -> None:
@@ -132,20 +153,20 @@ class ApiTransportMixin:
                     raise InvalidAuth(self._auth_error_message())
 
                 if response.status >= 400:
-                    body = await response.text()
+                    body = await read_response_text(response)
                     raise CannotConnect(
                         f"Console request failed with HTTP {response.status}: "
                         f"{safe_response_summary(body)}"
                     )
 
                 if not expect_json:
-                    await response.read()
+                    await read_response_body(response)
                     return None
 
+                body = await read_response_text(response)
                 try:
-                    data = await response.json(content_type=None)
+                    data = loads(body)
                 except JSONDecodeError as err:
-                    body = await response.text()
                     raise UnexpectedResponse(
                         f"Expected JSON from the console, got: {safe_response_summary(body)}"
                     ) from err
@@ -179,7 +200,7 @@ class ApiTransportMixin:
                 if status in (401, 403):
                     raise InvalidAuth(self._auth_error_message())
 
-                text = await response.text()
+                text = await read_response_text(response)
                 return status, text
 
         status, text = await self._request_with_timeout(_execute)
