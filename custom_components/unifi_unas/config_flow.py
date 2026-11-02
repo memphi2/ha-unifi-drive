@@ -330,6 +330,7 @@ class UnifiUnasConfigFlow(
     def __init__(self) -> None:
         """Initialize config-flow discovery state."""
         self._discovery_attempted = False
+        self._pending_user_state: _FlowState | None = None
         self._discovered_devices: dict[str, DiscoveredUnasDevice] = {}
         self._connection_defaults: dict[str, Any] | None = None
         self._feature_defaults: dict[str, Any] | None = None

@@ -683,6 +683,10 @@ def test_strict_typing_foundation_requires_typed_runtime_entry(
         "custom_components/unifi_unas/storage_helpers.py",
         "custom_components/unifi_unas/snapshot_payload.py",
     )
+    mypy_files = tuple(sorted(set(mypy_files) | {
+        f"custom_components/unifi_unas/{filename}"
+        for filename in module.TYPED_CONFIG_ENTRY_FILES
+    }))
     for relative_path in mypy_files:
         path = tmp_path / relative_path
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -710,6 +714,12 @@ def test_strict_typing_foundation_requires_typed_runtime_entry(
     monkeypatch.setattr(module, "VALIDATE_WORKFLOW_PATH", workflow_path)
 
     module.check_strict_typing_foundation()
+
+    new_module = integration_dir / "new_platform.py"
+    new_module.write_text("VALUE = 1\n", encoding="utf-8")
+    with pytest.raises(SystemExit):
+        module.check_strict_typing_foundation()
+    new_module.unlink()
 
     mypy_path.write_text(
         mypy_config.replace("custom_components/unifi_unas/api.py, ", ""),

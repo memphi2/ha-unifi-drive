@@ -1008,6 +1008,13 @@ def check_strict_typing_foundation() -> None:
         fail("typed ConfigEntry baseline failed:\n" + "\n".join(offenders))
 
     mypy_files = _mypy_configured_files(MYPY_PATH)
+    integration_files = {
+        f"custom_components/unifi_unas/{path.relative_to(INTEGRATION_DIR).as_posix()}"
+        for path in INTEGRATION_DIR.rglob("*.py")
+    }
+    omitted_files = sorted(integration_files - set(mypy_files))
+    if omitted_files:
+        fail(f"mypy.ini must cover every integration module: {omitted_files}")
     missing_files = [path for path in mypy_files if not (ROOT / path).is_file()]
     if missing_files:
         fail(f"mypy.ini references missing files: {missing_files}")

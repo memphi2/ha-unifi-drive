@@ -53,7 +53,7 @@ PARALLEL_UPDATES = 1
 
 
 @dataclass(frozen=True, kw_only=True)
-class SystemButtonDescription(ButtonEntityDescription):
+class SystemButtonDescription(ButtonEntityDescription):  # type: ignore[misc]
     """Description for a UniFi OS system button."""
 
     endpoint: str
@@ -147,8 +147,8 @@ def _snapshot_create_button_supported(
 
 
 class UnifiUnasSystemButton(
-    CoordinatorEntity[UnifiUnasCoordinator], ButtonEntity
-):  # type: ignore[misc]
+    CoordinatorEntity[UnifiUnasCoordinator], ButtonEntity  # type: ignore[misc]
+):
     """Button that triggers a UniFi OS system action."""
 
     _attr_has_entity_name = True
@@ -304,8 +304,8 @@ class UnifiUnasWakeOnLanButton(ButtonEntity):  # type: ignore[misc]
 
 
 class UnifiUnasBackupTaskButton(
-    CoordinatorEntity[UnifiUnasCoordinator], ButtonEntity
-):  # type: ignore[misc]
+    CoordinatorEntity[UnifiUnasCoordinator], ButtonEntity  # type: ignore[misc]
+):
     """Button that triggers a remote-backup task on the UNAS."""
 
     _attr_has_entity_name = True
@@ -387,8 +387,8 @@ class UnifiUnasBackupTaskButton(
 
 
 class UnifiUnasSnapshotButton(
-    UnifiUnasSnapshotTargetEntity, ButtonEntity
-):  # type: ignore[misc]
+    UnifiUnasSnapshotTargetEntity, ButtonEntity  # type: ignore[misc]
+):
     """Button that creates a snapshot on the UNAS."""
 
     def __init__(

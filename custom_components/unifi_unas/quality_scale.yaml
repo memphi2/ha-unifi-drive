@@ -163,4 +163,4 @@ rules:
     comment: The local API client receives a Home Assistant-created aiohttp session.
   strict-typing:
     status: todo
-    comment: Typed runtime ConfigEntry and strict mypy gate now cover setup/unload, coordinator, runtime, API client/mixins, config-flow helper, diagnostics, discovery, shared entity base, repairs, services, snapshot, storage and support modules; config-flow service/control surfaces and some HA platform layers remain.
+    comment: Every integration module is covered by strict mypy with an omission guard. Any payload and HA boundaries, follow_imports=skip and targeted base-class ignores remain; complete imported-type correctness is not yet claimed.

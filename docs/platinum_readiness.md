@@ -24,7 +24,7 @@ Home Assistant tier.
 | config-flow-test-coverage | Complete HA-driven tests of every setup, options, reauth and reconfigure branch. Helper coverage alone is insufficient. |
 | entity-unavailable | Monitoring intentionally retains last-known readings while Device online reports offline. This does not fully satisfy HA's sensor availability rule. Keep WOL usable and resolve this as an explicit compatibility decision. |
 | test-coverage | CI enforces 95% aggregate line coverage. HA requires more than 95% per module; close the gaps with behavior tests, not exclusions. |
-| strict-typing | Extend strict mypy from runtime/API/helpers to the remaining flow and entity platform modules without weakening checks. |
+| strict-typing | All integration modules are now in the strict mypy scope, guarded against omissions. Remaining work is narrowing Any payload/HA boundaries and validating imported HA types; follow_imports=skip and targeted base-class ignores remain. |
 
 Rule references: [flow coverage](https://contributors.home-assistant.io/core/quality-scale/config-flow-test-coverage/),
 [availability](https://contributors.home-assistant.io/core/quality-scale/entity-unavailable/),
@@ -46,7 +46,7 @@ Rule references: [flow coverage](https://contributors.home-assistant.io/core/qua
 ## Recommended Work Order
 
 1. Complete the HA-backed flow and per-module coverage gaps.
-2. Extend strict typing in small platform-specific batches.
+2. Narrow remaining Any boundaries without weakening the complete-module typing gate.
 3. Agree on sensor availability semantics before changing cached offline behavior.
 4. Repeat long-running RAM/CPU/Recorder measurements with a recorded commit,
    HA/Python versions, firmware, enabled entities, poll interval and workload.

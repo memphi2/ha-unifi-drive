@@ -96,9 +96,9 @@ async def async_setup_entry(
 
 
 class UnifiDriveUpdateEntity(
-    CoordinatorEntity[UnifiUnasCoordinator],
-    UpdateEntity,
-):  # type: ignore[misc]
+    CoordinatorEntity[UnifiUnasCoordinator],  # type: ignore[misc]
+    UpdateEntity,  # type: ignore[misc]
+):
     """UniFi OS or Drive update entity."""
 
     entity_description: UnifiDriveUpdateDescription
