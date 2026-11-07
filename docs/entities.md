@@ -11,7 +11,40 @@ UNAS entry.
 | `sensor` | throughput, uptime, system status, UniFi OS version, Drive version |
 | `binary_sensor` | storage problem, maintenance states |
 
-## Optional Control Entities
+With API-key authentication, the integration also attempts the local Drive
+`systems/device-info` endpoint for CPU temperature, network address, firmware,
+Drive version and startup time. These supplement existing entities; they do not
+change device identity or enable controls. UniFi OS metadata takes precedence.
+Startup-derived uptime is sampled on successful reads and stays frozen offline.
+
+Rebuild progress can fall back to data RAID-group percentages. It reports the
+least advanced active group, excluding SSD-cache groups. The new group fields
+are interpreted as percentages (1 means 1%, not 100%); missing or invalid values
+remain unknown. Explicit pool progress retains its existing precedence.
+Data scrubbing contributes to maintenance state, including a reported running
+operation at 0%. It is not relabeled as synchronization or rebuild progress.
+
+## Optional Diagnostics And Controls
+
+### Optional Drive Diagnostics
+
+Data drives and occupied SSD-cache slots can expose remaining life (`lifeSpan`),
+bad sectors (`badSectorCount`) and uncorrectable sectors
+(`uncorrectableSectorCount`). Only reported, valid values create these entities;
+unsupported metrics do not create permanently unknown diagnostics. New fields
+appearing later are detected without duplicating existing entities.
+
+These diagnostics, including cache temperature/status where reported, are
+disabled by default. Enable the individual entities under the device's entity
+list when needed. Values are not duplicated as attributes on other sensors.
+Changing values are recorded only after an entity is enabled (unless excluded
+from Recorder). No global Recorder or statistics settings are changed.
+
+Cache identities use device IDs or slot identifiers, never list positions or
+display names. Missing cache drives become unavailable; returning drives reuse
+their identities. Historical entities are retained, as for data drives.
+
+### Controls
 
 | Platform | Examples | Notes |
 | --- | --- | --- |

@@ -18,7 +18,8 @@ else:
 
 def coordinator_from_entry(entry: UnifiDriveConfigEntry) -> UnifiUnasCoordinator:
     """Return the loaded coordinator stored on ConfigEntry.runtime_data."""
-    return cast("UnifiUnasCoordinator", entry.runtime_data)
+    coordinator: UnifiUnasCoordinator = entry.runtime_data
+    return coordinator
 
 
 def coordinator_from_entry_or_none(

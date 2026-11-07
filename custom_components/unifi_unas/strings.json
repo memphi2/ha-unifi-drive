@@ -446,6 +446,15 @@
       "drive_power_on_hours": {
         "name": "{pool_name} {drive_name} Power-on hours"
       },
+      "drive_remaining_life": {
+        "name": "{pool_name} {drive_name} Remaining life"
+      },
+      "drive_bad_sectors": {
+        "name": "{pool_name} {drive_name} Bad sectors"
+      },
+      "drive_uncorrectable_sectors": {
+        "name": "{pool_name} {drive_name} Uncorrectable sectors"
+      },
       "snapshot_inventory": {
         "name": "{target_name} Snapshot inventory"
       },

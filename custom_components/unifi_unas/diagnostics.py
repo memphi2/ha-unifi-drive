@@ -63,6 +63,7 @@ _MANIFEST_PATH = Path(__file__).with_name("manifest.json")
 _SAFE_STORAGE_PAYLOAD_KEYS = frozenset(
     {
         "_system",
+        "_device_info",
         "activeRaidGroupId",
         "active_raid_group_id",
         "apps",

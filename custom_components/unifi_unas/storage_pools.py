@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from math import isfinite
 import re
 from typing import Any
 
@@ -509,11 +510,79 @@ def _pool_raid_level(pool: dict[str, Any]) -> str | None:
 
 def _pool_rebuild_progress(pool: dict[str, Any]) -> float | None:
     """Return rebuild/resilver progress in percent for a pool."""
-    return _pool_progress(
+    value = _pool_progress(
         pool,
         primary_keys=("rebuildProgress", "rebuild_percent", "resilverProgress"),
         context_hints=("rebuild", "resilver"),
     )
+    return value if value is not None else _raid_group_progress(pool)
+
+
+def _operation_active(operation: dict[str, Any]) -> bool | None:
+    """Distinguish explicit activity from stale progress on an idle operation."""
+    status = _normalized_token(_status_text(operation) or "")
+    if status in {
+        "running", "inprogress", "scrubbing", "rebuilding", "resyncing",
+        "resilvering", "syncing", "initializing",
+    }:
+        return True
+    if status in HEALTHY_STATUSES or status in {
+        "idle", "completed", "finished", "cancelled", "stopped", "failed", "paused",
+    }:
+        return False
+    return None
+
+
+def _operation_percent(operation: dict[str, Any]) -> float | None:
+    """Read percentage fields without interpreting 1 percent as completion."""
+    raw = operation.get("progress")
+    if isinstance(raw, bool) or not isinstance(raw, (int, float, str)):
+        return None
+    try:
+        value = float(raw)
+    except (ValueError, OverflowError):
+        return None
+    return round(value, 1) if isfinite(value) and 0 <= value <= 100 else None
+
+
+def _data_raid_groups(pool: dict[str, Any]) -> list[dict[str, Any]]:
+    """Exclude cache groups from data-array rebuild reporting."""
+    groups = pool.get("raidGroups")
+    if not isinstance(groups, list):
+        return []
+    return [
+        group for group in groups
+        if isinstance(group, dict) and not group.get("isSSDCache")
+    ]
+
+
+def _raid_group_progress(pool: dict[str, Any]) -> float | None:
+    """Report the least advanced active data group, not a misleading maximum."""
+    active: list[float] = []
+    known: list[float] = []
+    for group in _data_raid_groups(pool):
+        running = _operation_active(group)
+        progress = _operation_percent(group)
+        if running is True and progress is None:
+            return None
+        if running is False:
+            if progress is not None:
+                known.append(100.0 if progress == 100 else 0.0)
+            continue
+        if progress is not None:
+            known.append(progress)
+            if running is True or 0 < progress < 100:
+                active.append(progress)
+    return min(active) if active else min(known, default=None)
+
+
+def _operation_in_progress(operation: dict[str, Any]) -> bool:
+    """Respect explicit status, using progress only when no status is known."""
+    active = _operation_active(operation)
+    if active is not None:
+        return active
+    progress = _operation_percent(operation)
+    return progress is not None and 0 < progress < 100
 
 
 def _pool_sync_progress(pool: dict[str, Any]) -> float | None:
@@ -535,6 +604,11 @@ def _pool_has_problem(pool: dict[str, Any]) -> bool:
 
 def _pool_in_maintenance(pool: dict[str, Any]) -> bool:
     """Return whether a pool appears to be syncing/rebuilding."""
+    scrub = pool.get("dataScrubbing")
+    if isinstance(scrub, dict) and _operation_in_progress(scrub):
+        return True
+    if any(_operation_in_progress(group) for group in _data_raid_groups(pool)):
+        return True
     for value in (_pool_rebuild_progress(pool), _pool_sync_progress(pool)):
         if value is not None and 0 < value < 100:
             return True

@@ -18,6 +18,8 @@ from homeassistant.const import (
     CONF_SSL,
     CONF_USERNAME,
     CONF_VERIFY_SSL,
+    MAJOR_VERSION,
+    MINOR_VERSION,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
@@ -81,6 +83,7 @@ _LOGGER = logging.getLogger(__name__)
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 _DISCOVERY_FLOW_CLEANUP_DELAYS = (5, 15, 30)
 _DISCOVERY_METADATA_WRITE_INTERVAL_SECONDS = 5 * 60
+_ENTRY_METHOD_RETURNS_NONE = (MAJOR_VERSION, MINOR_VERSION) >= (2026, 11)
 
 
 async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
@@ -89,7 +92,7 @@ async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: UnifiDriveConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: UnifiDriveConfigEntry) -> bool | None:
     """Set up UniFi Drive from a config entry."""
     _async_backfill_discovery_mac(
         hass,
@@ -181,15 +184,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: UnifiDriveConfigEntry) -
     if remove_device_registry_listener is not None:
         entry.async_on_unload(remove_device_registry_listener)
     _async_schedule_discovery_flow_cleanup(hass, entry)
-    return True
+    return None if _ENTRY_METHOD_RETURNS_NONE else True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: UnifiDriveConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: UnifiDriveConfigEntry) -> bool | None:
     """Unload a config entry."""
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    if unload_ok:
-        _async_clear_entry_runtime(hass, entry)
-    return cast(bool, unload_ok)
+    if not unload_ok:
+        if _ENTRY_METHOD_RETURNS_NONE:
+            raise ConfigEntryError(
+                translation_domain="homeassistant",
+                translation_key="unload_platforms_failed",
+            )
+        return False
+    _async_clear_entry_runtime(hass, entry)
+    return None if _ENTRY_METHOD_RETURNS_NONE else True
 
 
 async def async_remove_config_entry_device(

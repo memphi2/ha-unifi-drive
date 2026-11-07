@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 import re
 from typing import Any
 
@@ -12,9 +13,51 @@ def normalized_token(value: str) -> str:
 
 
 def system_payload(data: dict[str, Any]) -> dict[str, Any]:
-    """Return the nested UniFi OS system payload."""
+    """Fill monitoring gaps without mixing Drive identity/status into UniFi OS."""
     system = data.get("_system")
-    return system if isinstance(system, dict) else {}
+    system = system if isinstance(system, dict) else {}
+    device_info = data.get("_device_info")
+    if not isinstance(device_info, dict):
+        return system
+    merged = dict(system)
+    for key in ("cpu", "networkInterfaces"):
+        fallback = device_info.get(key)
+        current = system.get(key)
+        if not isinstance(fallback, (dict, list)) or not fallback:
+            continue
+        if isinstance(fallback, dict) and isinstance(current, dict):
+            merged[key] = {
+                **fallback,
+                **{name: value for name, value in current.items() if value not in (None, "")},
+            }
+        elif current in (None, "", [], {}):
+            merged[key] = fallback
+    uptime_keys = (
+        "uptime", "uptimeSeconds", "uptime_seconds", "uptimeSec", "uptime_sec",
+        "uptimeMs", "uptime_ms", "uptimeMillis",
+    )
+    if not any(system.get(key) is not None for key in uptime_keys):
+        merged["uptime"] = device_info.get("uptime")
+    return merged
+
+
+def sampled_device_info(payload: dict[str, Any], now: datetime) -> dict[str, Any]:
+    """Sample startup-derived uptime once per successful read, not per property."""
+    result = dict(payload)
+    # Only the sampled value is used: an old startupTime must not advance offline.
+    result.pop("uptime", None)
+    started = payload.get("startupTime")
+    if not isinstance(started, str):
+        return result
+    try:
+        timestamp = datetime.fromisoformat(started.replace("Z", "+00:00"))
+    except ValueError:
+        return result
+    if timestamp.tzinfo is not None:
+        seconds = (now - timestamp).total_seconds()
+        if seconds >= 0:
+            result["uptime"] = seconds
+    return result
 
 
 def unifi_os_version(data: dict[str, Any]) -> str | None:
@@ -23,12 +66,18 @@ def unifi_os_version(data: dict[str, Any]) -> str | None:
     hardware = system.get("hardware")
     if isinstance(hardware, dict) and (version := _text(hardware.get("firmwareVersion"))):
         return version
-    return (
+    version = (
         _text(system.get("firmwareVersion"))
         or _text(system.get("firmware_version"))
         or _text(system.get("ucore_version"))
         or _text(system.get("version"))
     )
+    if version:
+        return version
+    device_info = data.get("_device_info")
+    if isinstance(device_info, dict):
+        return _text(device_info.get("firmwareVersion"))
+    return None
 
 
 def drive_version(data: dict[str, Any]) -> str | None:
@@ -43,6 +92,9 @@ def drive_version(data: dict[str, Any]) -> str | None:
     for key in ("controllers", "apps", "applications"):
         if version := _drive_version_from_items(system.get(key)):
             return version
+    device_info = data.get("_device_info")
+    if isinstance(device_info, dict):
+        return _text(device_info.get("version"))
     return None
 
 
@@ -70,8 +122,8 @@ def _drive_version_from_items(value: Any) -> str | None:
 
 
 def _text(value: Any) -> str | None:
-    """Return stripped text for non-empty non-boolean values."""
-    if isinstance(value, bool) or value in (None, ""):
+    """Return a version/name string without rendering structured payload values."""
+    if not isinstance(value, str):
         return None
-    text = str(value).strip()
+    text = value.strip()
     return text or None

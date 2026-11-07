@@ -8,6 +8,8 @@ from pathlib import Path
 import sys
 import types
 
+from tests.storage_fixtures import multi_pool_storage
+
 
 def _redact_data(value, keys):
     if isinstance(value, dict):
@@ -300,6 +302,48 @@ def test_diagnostics_export_does_not_contain_raw_identifiers() -> None:
 
     for raw_identifier in raw_identifiers:
         assert raw_identifier not in exported
+
+
+def test_drive_device_info_export_keeps_values_and_dynamic_keys_private(monkeypatch):
+    metadata = {
+        "firmwareVersion": "5.1.10", "version": "4.3.6",
+        "hostname": "private-device.example", "token": "private-metadata-token",
+        "serial": "private-device-serial", "startupTime": "2026-01-01T00:00:00Z",
+        "networkInterfaces": {"private-interface": {"ipAddress": "192.0.2.123",
+                                                    "macAddress": "02:00:00:00:00:99"}},
+        "cpu": {"temperature": 42},
+    }
+    monkeypatch.setattr(_FakeCoordinator, "data", {
+        **_FakeCoordinator.data, "_device_info": metadata,
+        "cacheSlots": [{"id": "private-cache-id", "serial": "private-cache-serial",
+                        "name": "private-cache-name", "lifeSpan": 99}],
+    })
+    result = asyncio.run(diagnostics_module.async_get_config_entry_diagnostics(_FakeHass(), _FakeEntry()))
+    exported = json.dumps(result, sort_keys=True)
+    for secret in ("private-device.example", "private-metadata-token", "private-device-serial",
+                   "private-interface", "192.0.2.123", "02:00:00:00:00:99",
+                   "2026-01-01T00:00:00Z", "5.1.10", "4.3.6"):
+        assert secret not in exported
+    for secret in ("private-cache-id", "private-cache-serial", "private-cache-name"):
+        assert secret not in exported
+    assert result["schema_version"] == 1
+    assert "_device_info" in exported
+
+
+def test_multi_pool_diagnostics_export_counts_without_disk_or_pool_identifiers(monkeypatch):
+    """Combined data/cache layouts keep support counts without revealing topology IDs."""
+    payload = multi_pool_storage()
+    monkeypatch.setattr(_FakeCoordinator, "data", payload)
+    result = asyncio.run(diagnostics_module.async_get_config_entry_diagnostics(_FakeHass(), _FakeEntry()))
+    exported = json.dumps(result, sort_keys=True)
+    for item in (*payload["pools"], *payload["disks"], *payload["cacheSlots"]):
+        for key in ("id", "serial", "name", "label", "poolId"):
+            if key in item:
+                assert item[key] not in exported
+    assert result["schema_version"] == 1
+    assert result["runtime"]["monitoring_health"]["pool_count"] == 2
+    assert result["runtime"]["monitoring_health"]["drive_count"] == 8
+    assert result["privacy"]["raw_storage_payload_values_included"] is False
 
 
 def test_diagnostics_uses_versioned_standard_shape() -> None:

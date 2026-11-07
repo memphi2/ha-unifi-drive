@@ -60,24 +60,25 @@ References: [Dependabot schedule and PR limits](https://docs.github.com/en/code-
 
 ## November 2026 Compatibility Review
 
-Reviewed on `2026-11-01`. Home Assistant `2026.11` is still a beta at this review
-date. CI covers `2024.8.0` / Python `3.12` / test helper `0.13.152` and the current
-stable `2026.10.4` / Python `3.14` / test helper `0.13.375`. The latter helper
-declares an exact dependency on HA `2026.10.4`; it is not suitable as a November
-test baseline. Marketplace documentation and catalog metadata alone do not prove
-runtime compatibility with the November release.
+Updated on `2026-11-08`. The latest stable Home Assistant is `2026.11.0`, requiring
+Python `3.14.2+`. CI covers that release on Python `3.14` alongside the supported
+`2024.8.0` minimum on Python `3.12` with legacy helper `0.13.152`.
+November uses the official `pytest-homeassistant` package from the matching Core
+commit `74cf5a49c63ed8d4d87717844bf14f79c28c9cea`. CI verifies the installed commit
+as well as the HA version and dependency consistency. The old custom-component
+helper `0.13.375` pins October and is not installed in the November environment.
 
-The `v0.9.0` [release checklist](release_0.9.0.md) targets a maintenance release
-on HA `2026.10.4`, retaining the tested `2024.8.0` minimum. It does not require
-November to ship. The following gates remain required before claiming HA
-`2026.11` or Marketplace runtime validation; no completed live Marketplace test
-result is implied.
+The `v0.9.0b1` [release checklist](release_0.9.0b1.md) targets an opt-in beta
+on stable HA `2026.11.0`, retaining the tested `2024.8.0` minimum. Automated
+HA-state, flow, lifecycle and Recorder tests are separate from live Marketplace
+installation/update/removal checks; no completed live Marketplace test is implied.
 
 | Area | Current status | Required follow-up |
 | --- | --- | --- |
 | Marketplace | Already in the shared catalog; `hacs.json` stays unchanged and the manifest declares `computers_network.nas_servers`. | Test a fresh install, HACS takeover, update and removal in HA `2026.11`; do not require reinstalling working `0.8.0+` entries. |
-| HA test baseline | November is not yet a CI matrix target. | Validate the full suite with matching HA/test-helper versions, including the real HA-backed tests, before updating the target and declaring support. Keep the advertised minimum leg. |
-| `DeviceInfo` dataclass | Registry metadata reads dataclass attributes; dictionary access is restricted to the legacy representation. Only non-empty strings are synchronized, so `UNDEFINED` cannot clear or corrupt existing fields. | Keep tests for both representations, missing firmware and unchanged metadata. The full November HA baseline remains a separate gate. |
+| HA test baseline | November stable and the minimum HA line run the complete suite with matching helpers, without dependency bypasses. | Keep both legs and the 95% coverage floor; verify helper provenance on future upgrades. |
+| Config-entry lifecycle | HA 2026.11 setup/unload return `None` on success and raise on failure. Older HA keeps its boolean contract. Failed unload preserves runtime ownership. | Keep success/failure and cleanup tests on both baselines. |
+| `DeviceInfo` dataclass | Registry metadata reads dataclass attributes; dictionary access is restricted to the legacy representation. Only non-empty strings are synchronized, so `UNDEFINED` cannot clear or corrupt existing fields. | Keep tests for both representations, missing firmware and unchanged metadata. |
 | Config-flow reloads | Reauth/reconfigure use `async_update_and_abort`; the entry listener owns reloads. Repository checks reject competing reload helpers. | Preserve this behavior: combining a reload helper with the listener becomes an error in HA `2026.12`. |
 | Restore state | No direct `RestoreStateData.last_states` use exists in the integration; a repository guard rejects reintroduction. | Keep using supported restore APIs. The removed `last_states` API is not a reason to rewrite this integration. |
 | Other platform changes | No climate/water-heater platform, HA Modbus helper or custom statistics-import path is implemented here. | Do not introduce unrelated migrations for those APIs; continue reviewing the APIs actually used by UNAS. |
@@ -89,6 +90,8 @@ Official references:
 - [DeviceInfo dataclass and compatibility methods](https://contributors.home-assistant.io/blog/2026/10/13/device-info-class/)
 - [Config-entry listener and reload deprecation](https://contributors.home-assistant.io/blog/2026/05/07/config-entry-listener-together-with-reloading-methods/)
 - [RestoreStateData.last_states removal](https://contributors.home-assistant.io/blog/2026/10/06/restore-state-last-states-removal/)
+- [HA 2026.11.0 release](https://github.com/home-assistant/core/releases/tag/2026.11.0)
+- [Official HA test helpers](https://github.com/home-assistant/core/blob/2026.11.0/packages/pytest-homeassistant/README.md)
 
 ## Remaining Maintenance Work
 
@@ -101,6 +104,11 @@ Official references:
   tests before changing the baseline; installation alone is not compatibility.
 - The Python `3.14` test leg sets the fixture event-loop scope explicitly. The
   minimum-version leg keeps its older pytest-asyncio-compatible configuration.
+- Pytest preloads HA before HTTP mocking plugins so HA can install its HTTPX
+  alias. Writable HA configuration is isolated per test. No warning filters are
+  added: HA's aiohttp application inheritance and `backoff`'s deprecated
+  `asyncio.iscoroutinefunction` calls still emit upstream warnings on Python 3.14.
+  They need upstream fixes, not changes to vendor packages inside this integration.
 - Release publication now depends on the reusable full validation workflow for
   the same tagged commit. The tag must match the manifest version. A green run
   still does not replace final-head Code Review. November live-test evidence

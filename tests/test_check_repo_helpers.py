@@ -34,7 +34,15 @@ def test_manifest_version_tag_adds_release_prefix() -> None:
     module = _load_check_repo_module()
 
     assert module._manifest_version_tag({"version": "0.3.6"}) == "v0.3.6"
-    assert module._manifest_version_tag({"version": "v0.3.6"}) == "v0.3.6"
+    assert module._manifest_version_tag({"version": "0.9.0b1"}) == "v0.9.0b1"
+    assert module._manifest_version_tag({"version": "0.9.0rc1"}) == "v0.9.0rc1"
+
+
+@pytest.mark.parametrize("version", ["v0.3.6", "0.9.01b1", "0.9.0b0", "0.9.0+local", "0.9.0\n", None])
+def test_manifest_version_tag_rejects_noncanonical_versions(version):
+    module = _load_check_repo_module()
+    with pytest.raises(SystemExit):
+        module._manifest_version_tag({"version": version})
 
 
 def test_manifest_version_tag_rejects_missing_version() -> None:
@@ -437,128 +445,38 @@ def test_workflow_python_versions_require_compatibility_matrix(
         module.check_workflow_python_versions()
 
 
+@pytest.mark.parametrize("removed", [
+    '"core"', 'helper_commit: "74cf5a49c63ed8d4d87717844bf14f79c28c9cea"',
+    "python -m pip check", 'helper.get("vcs_info", {}).get("commit_id") != commit',
+    "pytest-homeassistant @ git+https://github.com/home-assistant/core.git",
+])
 def test_validate_workflow_requires_homeassistant_compatibility_targets(
-    tmp_path,
-    monkeypatch: pytest.MonkeyPatch,
+    removed, tmp_path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Repository checks should keep CI pinned to tested HA compatibility lines."""
+    """Missing helper pins, install steps or provenance checks must fail CI."""
     module = _load_check_repo_module()
-    workflow_path = tmp_path / "validate.yml"
-    workflow_path.write_text(
-        "strategy:\n"
-        "  matrix:\n"
-        "    include:\n"
-        "      - homeassistant: \"2024.8.0\"\n"
-        "        python: \"3.12\"\n"
-        "        pytest_homeassistant: \"0.13.152\"\n"
-        "      - homeassistant: \"2026.10.4\"\n"
-        "        python: \"3.14\"\n"
-        "        pytest_homeassistant: \"0.13.375\"\n"
-        "steps:\n"
-        "  - uses: actions/setup-python@v6\n"
-        "    with:\n"
-        "      python-version: ${{ matrix.python }}\n"
-        "      check-latest: true\n"
-        "  - run: |\n"
-        "      pip install "
-        "-c \"https://raw.githubusercontent.com/home-assistant/core/${{ matrix.homeassistant }}/homeassistant/package_constraints.txt\" "
-        "\"homeassistant==${{ matrix.homeassistant }}\" "
-        "\"josepy<2.0; python_version < '3.13'\" pytest\n"
-        "      pip install \"pytest-homeassistant-custom-component==${{ matrix.pytest_homeassistant }}\"\n"
-        "      python -m pip check\n"
-        "  - run: |\n"
-        "      import os\n"
-        "      import importlib.metadata as md\n"
-        "      expected = os.environ[\"EXPECTED_HOMEASSISTANT_VERSION\"]\n"
-        "      version = md.version(\"homeassistant\")\n"
-        "      if version != expected:\n"
-        "          raise SystemExit()\n",
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(module, "VALIDATE_WORKFLOW_PATH", workflow_path)
-
+    source = module.VALIDATE_WORKFLOW_PATH.read_text(encoding="utf-8")
     module.check_validate_workflow_homeassistant_target()
-
-    workflow_path.write_text(
-        workflow_path.read_text(encoding="utf-8").replace(
-            '        pytest_homeassistant: "0.13.375"\n',
-            "",
-        ),
-        encoding="utf-8",
-    )
-    with pytest.raises(SystemExit):
-        module.check_validate_workflow_homeassistant_target()
-
-    workflow_path.write_text(
-        "strategy:\n"
-        "  matrix:\n"
-        "    include:\n"
-        "      - homeassistant: \"2024.8.0\"\n"
-        "        python: \"3.12\"\n"
-        "        pytest_homeassistant: \"0.13.152\"\n"
-        "      - homeassistant: \"2026.10.4\"\n"
-        "        python: \"3.14\"\n"
-        "        pytest_homeassistant: \"0.13.375\"\n"
-        "steps:\n"
-        "  - uses: actions/setup-python@v6\n"
-        "    with:\n"
-        "      python-version: ${{ matrix.python }}\n"
-        "      check-latest: true\n"
-        "  - run: |\n"
-        "      pip install "
-        "-c \"https://raw.githubusercontent.com/home-assistant/core/${{ matrix.homeassistant }}/homeassistant/package_constraints.txt\" "
-        "\"homeassistant==${{ matrix.homeassistant }}\" "
-        "\"josepy<2.0; python_version < '3.13'\" pytest\n",
-        encoding="utf-8",
-    )
+    assert removed in source
+    path = tmp_path / "validate.yml"
+    path.write_text(source.replace(removed, ""), encoding="utf-8")
+    monkeypatch.setattr(module, "VALIDATE_WORKFLOW_PATH", path)
     with pytest.raises(SystemExit):
         module.check_validate_workflow_homeassistant_target()
 
 
 def test_validate_workflow_must_cover_hacs_minimum(
-    tmp_path,
-    monkeypatch: pytest.MonkeyPatch,
+    tmp_path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """CI must test the Home Assistant minimum advertised in hacs.json."""
     module = _load_check_repo_module()
-    workflow_path = tmp_path / "validate.yml"
-    hacs_path = tmp_path / "hacs.json"
-    workflow_path.write_text(
-        "strategy:\n"
-        "  matrix:\n"
-        "    include:\n"
-        "      - homeassistant: \"2024.8.0\"\n"
-        "        python: \"3.12\"\n"
-        "        pytest_homeassistant: \"0.13.152\"\n"
-        "      - homeassistant: \"2026.10.4\"\n"
-        "        python: \"3.14\"\n"
-        "        pytest_homeassistant: \"0.13.375\"\n"
-        "steps:\n"
-        "  - run: |\n"
-        "      pip install "
-        "-c \"https://raw.githubusercontent.com/home-assistant/core/${{ matrix.homeassistant }}/homeassistant/package_constraints.txt\" "
-        "\"homeassistant==${{ matrix.homeassistant }}\"\n"
-        "      pip install \"pytest-homeassistant-custom-component==${{ matrix.pytest_homeassistant }}\"\n"
-        "      python -m pip check\n"
-        "      version = md.version(\"homeassistant\")\n"
-        "      if version != expected:\n"
-        "          raise SystemExit()\n"
-        "      josepy<2.0; python_version < '3.13'\n",
-        encoding="utf-8",
-    )
-    hacs_path.write_text(
-        '{"name": "UniFi Drive / UNAS", "homeassistant": "2024.8.0"}\n',
-        encoding="utf-8",
-    )
-    monkeypatch.setattr(module, "VALIDATE_WORKFLOW_PATH", workflow_path)
-    monkeypatch.setattr(module, "HACS_PATH", hacs_path)
-
     module.check_validate_workflow_homeassistant_target()
-
+    hacs_path = tmp_path / "hacs.json"
     hacs_path.write_text(
         '{"name": "UniFi Drive / UNAS", "homeassistant": "2025.1.0"}\n',
         encoding="utf-8",
     )
+    monkeypatch.setattr(module, "HACS_PATH", hacs_path)
     with pytest.raises(SystemExit):
         module.check_validate_workflow_homeassistant_target()
 
@@ -739,14 +657,19 @@ def test_strict_typing_foundation_requires_typed_runtime_entry(
 
 def test_imported_ha_typing_gate_rejects_skipped_imports(tmp_path, monkeypatch):
     module = _load_check_repo_module()
+    files = ("scripts/typecheck_ha_contract.py",) + tuple(
+        f"custom_components/unifi_unas/{name}.py"
+        for name in ("device", "runtime", "entity_base", "entry_reload",
+                     "sensor_descriptions", "binary_sensor_descriptions")
+    )
     config = (
         "[mypy]\nstrict = True\nfollow_imports = silent\n"
         "disallow_any_unimported = True\ndisallow_any_expr = True\n"
-        "files = scripts/typecheck_ha_contract.py, custom_components/unifi_unas/device.py\n"
+        f"files = {', '.join(files)}\n"
     )
     path = tmp_path / "mypy-ha.ini"
     path.write_text(config)
-    for name in ("scripts/typecheck_ha_contract.py", "custom_components/unifi_unas/device.py"):
+    for name in files:
         file = tmp_path / name
         file.parent.mkdir(parents=True, exist_ok=True)
         file.write_text("# Synthetic typing contract fixture\n")
@@ -755,6 +678,9 @@ def test_imported_ha_typing_gate_rejects_skipped_imports(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "ROOT", tmp_path)
     monkeypatch.setattr(module, "VALIDATE_WORKFLOW_PATH", workflow)
     module.check_imported_ha_typing_gate()
+    path.write_text(config.replace(", custom_components/unifi_unas/runtime.py", ""))
+    with pytest.raises(SystemExit):
+        module.check_imported_ha_typing_gate()
     path.write_text(config.replace("silent", "skip"))
     with pytest.raises(SystemExit):
         module.check_imported_ha_typing_gate()

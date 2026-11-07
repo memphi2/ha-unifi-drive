@@ -1,5 +1,36 @@
 # Runtime Resource Measurements
 
+## Metadata Polling
+
+After authentication and the core storage read, independent system, network-I/O
+and API-key device-info reads run concurrently in a joined task group. Each has
+a 2.5-second timeout; cancellation waits for the child requests to finish cleanup.
+Optional endpoint failures do not trigger parallel logins.
+
+Only explicitly static system payloads under API-key authentication are cached
+for ten minutes. Unknown fields, live metrics, application lists and status data
+prevent caching. Network-I/O and device-info remain live on every poll; optional
+backup/fan polling keeps its existing cadence and budget. Explicit refreshes,
+connection checks and core connection/authentication failures invalidate the
+static cache. An invalidation during an in-flight request is not lost.
+
+Synthetic measurements on the local Python 3.14 test environment:
+
+| Case | Before | After |
+| --- | --- | --- |
+| Three metadata reads with 40 ms simulated latency each, median of seven samples | 120.9 ms sequential | 40.4 ms concurrent |
+| 20 API-key polls at 30 seconds with a static core payload | 80 requests | 61 requests |
+| Network-I/O and device-info reads in that request-count case | 20 each | 20 each |
+
+The request-count and cancellation assertions are regression tests in
+`tests/test_api_runtime_paths.py`. Elapsed-time results are illustrative, not
+machine-dependent CI thresholds or measured NAS/VLAN performance. Dynamic core
+payloads still require 80 requests in that example. SQLite Recorder tests verify
+that changing disabled cache diagnostics creates no state rows; enabled
+diagnostics record changes without duplicated SMART attributes.
+
+## Lifecycle Measurements
+
 HTTP bodies are read in bounded chunks with an 8 MiB decompressed-body limit,
 including login, error replies and chunked responses. Oversized responses fail
 without including their content in the error. This bounds the integration's

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from math import isfinite
+
 import re
 from typing import Any
 
@@ -651,6 +653,68 @@ def _drive_number(drive: dict[str, Any], keys: tuple[str, ...]) -> float | None:
         value = _first_number(nested, keys)
         if value is not None:
             return value
+    return None
+
+
+def _drive_diagnostic_number(drive: dict[str, Any], key: str) -> float | None:
+    """Read only validated device-reported SMART metrics, without guessing units."""
+    for source in (drive, *_dict_values(drive, DRIVE_DETAIL_CONTAINER_KEYS)):
+        raw = source.get(key)
+        if isinstance(raw, bool) or not isinstance(raw, (int, float, str)):
+            continue
+        try:
+            value = float(raw)
+        except (ValueError, OverflowError):
+            continue
+        if isfinite(value) and value >= 0:
+            return value
+    return None
+
+
+def _drive_remaining_life(drive: dict[str, Any]) -> float | None:
+    """Return remaining life only when reported in the expected percent range."""
+    value = _drive_diagnostic_number(drive, "lifeSpan")
+    return round(value, 1) if value is not None and value <= 100 else None
+
+
+def _drive_bad_sectors(drive: dict[str, Any]) -> int | None:
+    """Return a non-negative, integral bad-sector count."""
+    value = _drive_diagnostic_number(drive, "badSectorCount")
+    return int(value) if value is not None and value.is_integer() else None
+
+
+def _drive_uncorrectable_sectors(drive: dict[str, Any]) -> int | None:
+    """Return a non-negative, integral uncorrectable-sector count."""
+    value = _drive_diagnostic_number(drive, "uncorrectableSectorCount")
+    return int(value) if value is not None and value.is_integer() else None
+
+
+def _cache_drives(data: dict[str, Any] | None) -> list[dict[str, Any]]:
+    """Read occupied cache slots with stable identity; never invent positional IDs."""
+    if not isinstance(data, dict):
+        return []
+    slots = data.get("cacheSlots")
+    if not isinstance(slots, list):
+        return []
+    drives: dict[str, dict[str, Any]] = {}
+    for slot in slots:
+        if not isinstance(slot, dict) or slot.get("present") is False:
+            continue
+        if str(slot.get("state", "")).lower() in {"empty", "absent", "removed"}:
+            continue
+        key = _cache_drive_key(slot)
+        if key is None:
+            continue
+        drives.setdefault(key, slot)
+    return list(drives.values())
+
+
+def _cache_drive_key(drive: dict[str, Any]) -> str | None:
+    """Cache identity never depends on a display name or list position."""
+    for key in ("id", "uuid", "serial", "wwn", "slotId", "slot", "bay"):
+        value = drive.get(key)
+        if isinstance(value, (str, int)) and not isinstance(value, bool) and str(value).strip():
+            return _slug(f"{key}_{value}")
     return None
 
 

@@ -77,6 +77,8 @@ class UnifiUnasApiClient(
         self._authenticated = self._use_api_key_auth
         self._login_data: dict[str, Any] | None = None
         self._system_info: dict[str, Any] | None = None
+        self._system_metadata_cached_at: float | None = None
+        self._system_metadata_generation = 0
         self._last_fan_mode: str | None = None
         self._fan_mode_read_supported: bool | None = None
         self._fan_mode_write_supported: bool | None = None

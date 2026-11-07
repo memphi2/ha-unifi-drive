@@ -14,7 +14,8 @@
 
 Use a published release for normal operation. A development checkout or a copied
 test build is not a published Marketplace release. The instructions for HA
-`2026.11` describe Marketplace, not a claim of completed November runtime tests.
+`2026.11` describe Marketplace; automated November HA tests do not replace live
+catalog installation/update/removal testing.
 
 ## Home Assistant Marketplace
 

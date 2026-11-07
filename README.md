@@ -3,6 +3,7 @@
 [![Validate](https://github.com/memphi2/ha-unifi-drive/actions/workflows/validate.yml/badge.svg)](https://github.com/memphi2/ha-unifi-drive/actions/workflows/validate.yml)
 [![Quality](https://img.shields.io/badge/Quality-HA%20QS%20Platinum%20Track-0366d6?style=flat-square)](custom_components/unifi_unas/quality_scale.yaml)
 [![GitHub Release](https://img.shields.io/github/v/release/memphi2/ha-unifi-drive?display_name=tag&sort=semver&label=release)](https://github.com/memphi2/ha-unifi-drive/releases/latest)
+[![Marketplace](https://img.shields.io/badge/Home_Assistant-Marketplace-41BDF5?style=flat-square)](https://contributors.home-assistant.io/marketplace/)
 [![License MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 Monitor your UniFi Drive / UNAS storage in Home Assistant and automate the local
@@ -31,6 +32,10 @@ restore actions are not provided. Lowering retention may let the NAS expire olde
 
 See the [entity overview](docs/entities.md) for the available sensors and controls.
 
+Optional SSD-cache and drive diagnostics include remaining life and sector-error
+counts where the firmware reports them. They are disabled by default; enable only
+the entities you need to keep unnecessary history out of Recorder.
+
 ## Options
 
 Open `Settings` -> `Devices & services` -> **UniFi Drive / UNAS** -> `Configure`.
@@ -45,11 +50,13 @@ restart/shutdown and update entities are not separate feature switches in option
 ## Supported Devices
 
 Live testing and community feedback cover **UNAS2** and **UNAS4**, with different
-coverage by feature and firmware. Other UniFi Drive / UNAS models are not yet
-verified; non-UniFi NAS devices are unsupported.
+coverage by feature and firmware. **UNAS Pro, Pro4 and Pro8** are not yet verified
+with this integration; non-UniFi NAS devices are unsupported.
 
 Check the [device and firmware matrix](docs/firmware_matrix.md) for the tested
-combinations and the scope of each result.
+combinations and the scope of each result. Using a larger UNAS? A
+[hardware compatibility report](docs/hardware_validation.md) helps verify pool,
+drive and SSD-cache readings without sharing private device data.
 
 ## Installation
 
@@ -103,6 +110,10 @@ Back up Home Assistant and read the [release notes](https://github.com/memphi2/h
 Install the update offered by Marketplace under `Settings` -> `Updates`,
 or by HACS on older HA versions, then complete any restart request.
 
+Beta releases are opt-in and do not replace the stable update channel. To try
+one, enable prerelease versions in HACS, select the desired beta version and
+restart Home Assistant. Back up first and read the beta's release notes.
+
 Keep existing entries when updating integration `0.8.0+`. Moving from HACS to
 Marketplace does not require a reinstall.
 
@@ -111,14 +122,19 @@ Versions before `0.8.0` must be removed and reinstalled; follow the
 
 ## Data Updates
 
-Monitoring uses local polling with a minimum interval of 30 seconds. System and
-network metadata reads each have a 2.5-second timeout; slow metadata cannot hold
+Monitoring uses local polling with a minimum interval of 30 seconds. Independent
+metadata reads run concurrently, each with a 2.5-second timeout; slow metadata cannot hold
 up a successful storage read for the full transport timeout. Optional
 polling shares a ten-second budget with time reserved for each enabled feature,
 so a slow endpoint cannot block later features or core updates indefinitely.
 Snapshot inventory normally refreshes every ten minutes. Larger batches resume
 over subsequent polls without discarding completed target reads; interrupted
 targets do not prevent other targets from progressing.
+
+API-key polling caches explicitly static system metadata for up to ten minutes.
+Live metrics and unrecognized payloads are not cached; explicit action refreshes
+bypass this cache. See [runtime measurements](docs/runtime_measurements.md) for
+the synthetic performance results and their limits.
 
 After two consecutive connection failures, `Device online` reports off and
 `System status` reports offline. Core monitoring sensors retain their last known

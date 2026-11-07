@@ -9,9 +9,9 @@ from unittest.mock import patch
 import pytest
 
 from tests.ha_test_helpers import (
-    ROOT,
     ensure_repo_custom_components_path as _ensure_repo_custom_components_path,
 )
+from tests.storage_fixtures import multi_pool_storage
 
 try:
     from homeassistant.const import (
@@ -34,12 +34,6 @@ except (ImportError, AttributeError):
 
 
 GIB = 1024**3
-
-
-@pytest.fixture
-def hass_config_dir() -> str:
-    """Point Home Assistant at this repository's test config directory."""
-    return str(ROOT)
 
 
 def _entry_data() -> dict[str, Any]:
@@ -118,6 +112,9 @@ class _MonitoringClient:
         self.storage = _storage_payload()
         self.offline = False
 
+    def invalidate_system_metadata(self) -> None:
+        """The synthetic monitoring client has no metadata cache."""
+
     async def async_get_storage(self) -> dict[str, Any]:
         """Return storage or simulate an offline device."""
         if self.offline:
@@ -150,7 +147,7 @@ class _MonitoringClient:
 async def _async_setup_monitoring_entry(hass, client):
     """Patch network calls and initialize the integration."""
     from homeassistant.setup import async_setup_component
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from tests.ha_test_compat import MockConfigEntry
 
     from custom_components.unifi_unas.const import DOMAIN
 
@@ -198,6 +195,220 @@ def _state(hass, entity_id: str) -> str:
     state = hass.states.get(entity_id)
     assert state is not None, entity_id
     return state.state
+
+
+@pytest.mark.asyncio
+async def test_device_metadata_fallback_updates_device_and_freezes_offline(hass, freezer):
+    """API-key metadata uses existing entities and keeps sampled uptime offline."""
+    from homeassistant.helpers import device_registry as dr
+    from custom_components.unifi_unas.const import DOMAIN
+
+    client = _MonitoringClient()
+    client.storage["_system"] = {"status": "online"}
+    client.storage["_device_info"] = {
+        "firmwareVersion": "5.1.10", "version": "4.3.6", "uptime": 7200,
+        "startupTime": "2026-01-01T00:00:00Z", "cpu": {"temperature": 42},
+        "networkInterfaces": [{"ipAddress": "192.0.2.10"}],
+    }
+    entry = await _async_setup_monitoring_entry(hass, client)
+    coordinator = entry.runtime_data
+    values = {"system_uptime": "2.0", "unifi_os_version": "5.1.10",
+              "drive_version": "4.3.6", "cpu_temperature": "42.0", "system_ip": "192.0.2.10"}
+    ids = {key: _entity_id_for_unique_id(hass, entry, f"device-1_{key}") for key in values}
+    for key, expected in values.items():
+        assert _state(hass, ids[key]) == expected
+    devices = dr.async_entries_for_config_entry(dr.async_get(hass), entry.entry_id)
+    device = next(item for item in devices if (DOMAIN, "device-1") in item.identifiers)
+    assert device.sw_version == "5.1.10"
+    client.offline = True
+    freezer.tick(3600)
+    for _ in range(2):
+        await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator.is_device_online is False
+    assert _state(hass, ids["system_uptime"]) == "2.0"
+    client.offline = False
+    client.storage["_device_info"]["uptime"] = 10800
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert _state(hass, ids["system_uptime"]) == "3.0"
+
+
+@pytest.mark.asyncio
+async def test_scrubbing_and_raid_groups_drive_existing_maintenance_states(hass):
+    """Idle/completed operations clear existing maintenance entities."""
+    client = _MonitoringClient()
+    entry = await _async_setup_monitoring_entry(hass, client)
+    coordinator = entry.runtime_data
+    active_id = _entity_id_for_unique_id(hass, entry, "device-1_maintenance_active")
+    count_id = _entity_id_for_unique_id(hass, entry, "device-1_maintenance_pool_count")
+    for operation, active in (
+        ({"dataScrubbing": {"status": "running", "progress": 0}}, True),
+        ({"dataScrubbing": {"status": "idle", "progress": 50}}, False),
+        ({"raidGroups": [{"progress": 1}]}, True),
+        ({"raidGroups": [{"progress": 100}]}, False),
+        ({"raidGroups": [{"progress": 50, "isSSDCache": True}]}, False),
+    ):
+        client.storage = _storage_payload()
+        client.storage["pools"][0].update(operation)
+        await coordinator.async_refresh()
+        await hass.async_block_till_done()
+        assert _state(hass, active_id) == ("on" if active else "off")
+        assert _state(hass, count_id) == ("1" if active else "0")
+
+
+@pytest.mark.asyncio
+async def test_drive_diagnostics_are_opt_in_and_late_fields_do_not_duplicate_entities(hass):
+    from homeassistant.helpers import entity_registry as er
+
+    client = _MonitoringClient()
+    client.storage["cacheSlots"] = [{"id": "cache-a", "lifeSpan": 99, "temperature": 30}]
+    entry = await _async_setup_monitoring_entry(hass, client)
+    registry = er.async_get(hass)
+    def entries():
+        return er.async_entries_for_config_entry(registry, entry.entry_id)
+    cache = [item for item in entries() if ":cache:" in item.unique_id]
+    assert len(cache) == 2
+    assert all(item.disabled_by is er.RegistryEntryDisabler.INTEGRATION for item in cache)
+    assert all(hass.states.get(item.entity_id) is None for item in cache)
+    client.storage["pools"][0]["drives"][0]["badSectorCount"] = 0
+    for _ in range(3):
+        await entry.runtime_data.async_refresh()
+        await hass.async_block_till_done()
+    added = [item for item in entries() if item.translation_key == "drive_bad_sectors"]
+    assert len(added) == 1
+    assert added[0].disabled_by is er.RegistryEntryDisabler.INTEGRATION
+    assert hass.states.get(added[0].entity_id) is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("drive_count", [4, 7, 8])
+async def test_multi_pool_diagnostics_stay_disabled_and_registry_stays_bounded(hass, drive_count):
+    """Larger synthetic layouts do not enable extra history or duplicate entities."""
+    from homeassistant.helpers import entity_registry as er
+    from custom_components.unifi_unas.sensor_descriptions import DRIVE_SENSOR_TYPES
+
+    client = _MonitoringClient()
+    client.storage = multi_pool_storage(drive_count)
+    entry = await _async_setup_monitoring_entry(hass, client)
+    registry = er.async_get(hass)
+    initial = er.async_entries_for_config_entry(registry, entry.entry_id)
+    initial_ids = {item.unique_id: item.entity_id for item in initial}
+    drive_keys = {description.translation_key for description in DRIVE_SENSOR_TYPES}
+    diagnostics = [item for item in initial if item.translation_key in drive_keys]
+    assert len(diagnostics) == drive_count * 5 + 2 * 5
+    assert all(item.disabled_by is er.RegistryEntryDisabler.INTEGRATION for item in diagnostics)
+    assert all(hass.states.get(item.entity_id) is None for item in diagnostics)
+
+    for _ in range(3):
+        client.storage["pools"].reverse()
+        client.storage["disks"].reverse()
+        client.storage["cacheSlots"].reverse()
+        await entry.runtime_data.async_refresh()
+        await hass.async_block_till_done()
+        assert {
+            item.unique_id: item.entity_id
+            for item in er.async_entries_for_config_entry(registry, entry.entry_id)
+        } == initial_ids
+        assert all(hass.states.get(item.entity_id) is None for item in diagnostics)
+
+
+@pytest.mark.asyncio
+async def test_multi_pool_enabled_readings_keep_identity_through_topology_changes(hass, monkeypatch):
+    """Enabled data/cache readings remain isolated across reorder, loss and recovery."""
+    from dataclasses import replace
+    from homeassistant.helpers import entity_registry as er
+    from custom_components.unifi_unas import entities
+
+    monkeypatch.setattr(entities, "DRIVE_SENSOR_TYPES", tuple(
+        replace(description, entity_registry_enabled_default=True)
+        for description in entities.DRIVE_SENSOR_TYPES
+    ))
+    client = _MonitoringClient()
+    client.storage = multi_pool_storage()
+    entry = await _async_setup_monitoring_entry(hass, client)
+    coordinator = entry.runtime_data
+    registry = er.async_get(hass)
+    initial_ids = {
+        item.unique_id: item.entity_id
+        for item in er.async_entries_for_config_entry(registry, entry.entry_id)
+    }
+    data_ids = [
+        initial_ids[f"device-1_pool_{'a' if index % 2 == 0 else 'b'}_disk_{index}_drive_temperature"]
+        for index in range(8)
+    ]
+    cache_ids = [initial_ids[f"device-1:cache:id_disk_{index}:drive_temperature"] for index in range(2)]
+
+    client.storage["pools"].reverse()
+    client.storage["disks"].reverse()
+    client.storage["cacheSlots"].reverse()
+    for pool in client.storage["pools"]:
+        pool["label"] = "Renamed " + pool["id"]
+    for disk in client.storage["disks"]:
+        disk["temperature"] += 1
+    for disk in client.storage["cacheSlots"]:
+        disk["name"] = "Renamed " + disk["id"]
+        disk["temperature"] += 1
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert [_state(hass, entity_id) for entity_id in data_ids] == [f"{31 + i}.0" for i in range(8)]
+    assert [_state(hass, entity_id) for entity_id in cache_ids] == ["41.0", "42.0"]
+
+    missing_pool = client.storage["pools"].pop()
+    missing_cache = client.storage["cacheSlots"].pop()
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    for index, entity_id in enumerate(data_ids):
+        assert _state(hass, entity_id) == ("unavailable" if index % 2 == 0 else f"{31 + index}.0")
+    assert _state(hass, cache_ids[0]) == "unavailable"
+    assert _state(hass, cache_ids[1]) == "42.0"
+
+    client.storage["pools"].append(missing_pool)
+    client.storage["cacheSlots"].append(missing_cache)
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    client.offline = True
+    for _ in range(2):
+        await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator.is_device_online is False
+    assert [_state(hass, entity_id) for entity_id in data_ids] == [f"{31 + i}.0" for i in range(8)]
+    assert [_state(hass, entity_id) for entity_id in cache_ids] == ["41.0", "42.0"]
+    client.offline = False
+    await coordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert coordinator.is_device_online is True
+    assert {
+        item.unique_id: item.entity_id
+        for item in er.async_entries_for_config_entry(registry, entry.entry_id)
+    } == initial_ids
+
+
+@pytest.mark.asyncio
+async def test_enabled_cache_sensor_survives_removal_reappearance_and_reordering(hass, monkeypatch):
+    from dataclasses import replace
+    from custom_components.unifi_unas import entities
+
+    # Simulate an enabled diagnostic without changing production defaults.
+    monkeypatch.setattr(entities, "DRIVE_SENSOR_TYPES", tuple(
+        replace(description, entity_registry_enabled_default=True)
+        for description in entities.DRIVE_SENSOR_TYPES
+    ))
+    client = _MonitoringClient()
+    disk = {"id": "cache-a", "lifeSpan": 99}
+    client.storage["cacheSlots"] = [disk]
+    entry = await _async_setup_monitoring_entry(hass, client)
+    entity_id = _entity_id_for_unique_id(hass, entry, "device-1:cache:id_cache_a:drive_remaining_life")
+    assert _state(hass, entity_id) == "99.0"
+    client.storage["cacheSlots"] = []
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+    assert _state(hass, entity_id) == "unavailable"
+    client.storage["cacheSlots"] = [{"id": "cache-b", "lifeSpan": 80}, {**disk, "name": "Renamed"}]
+    await entry.runtime_data.async_refresh()
+    await hass.async_block_till_done()
+    assert _state(hass, entity_id) == "99.0"
+    assert _entity_id_for_unique_id(hass, entry, "device-1:cache:id_cache_a:drive_remaining_life") == entity_id
 
 
 @pytest.mark.asyncio

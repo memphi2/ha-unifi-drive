@@ -4,6 +4,18 @@
 - Only local UniFi OS / Drive endpoint behavior is covered; no cloud control
   path is implemented.
 - Endpoint behavior and permission requirements can vary by firmware.
+- API-key device metadata and RAID-group/scrubbing fallbacks have synthetic
+  regression coverage, not new live-device validation. Missing metadata remains
+  unknown; an optional endpoint failure does not make core storage unavailable.
+  Device metadata is attempted once per API-key poll with a 2.5-second timeout;
+  username/password polling does not gain an additional request.
+- SSD-cache and additional SMART diagnostics depend on firmware-reported fields
+  and have synthetic coverage only. Enabled diagnostic entities add history;
+  leave them disabled if those readings are not needed. Slots without stable
+  identity are ignored rather than creating position-dependent entities.
+- Larger layouts have synthetic multi-pool, data-drive and cache coverage, not
+  confirmed UNAS Pro/Pro4/Pro8 support. See the [evidence matrix](firmware_matrix.md)
+  and [hardware reporting guide](hardware_validation.md) before making a model claim.
 - Snapshot entities are opt-in. Reducing retention can cause the NAS to expire
   old snapshots according to its own policy; review the limit before changing it.
 - Snapshot delete/restore actions are intentionally not provided.

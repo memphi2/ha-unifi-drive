@@ -2,4 +2,5 @@
 # Keep compatible with both Python versions in the validation matrix.
 bandit==1.9.4
 mypy==2.4.1
-ruff==0.17.3
+ruff==0.17.4
+coverage==7.16.2; python_version >= '3.14'

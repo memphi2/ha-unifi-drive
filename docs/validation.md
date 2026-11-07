@@ -9,13 +9,14 @@ Additional regression commands and their scope:
 
 - [Recorder measurements and history profiles](recorder.md)
 - [Bounded RAM/task lifecycle measurements](runtime_measurements.md)
+- [Hardware evidence and larger storage layouts](hardware_validation.md)
 
 Verify a committed candidate locally with `python scripts/release_check.py`.
 After publication, verify the exact approved tag, release notes and downloaded
 installation ZIP against Git content:
 
 ```bash
-python scripts/release_check.py --ref v0.9.0 --published
+python scripts/release_check.py --ref v0.9.0b1 --published
 ```
 
 Use the tag being checked, not an unrelated development HEAD. The release
@@ -58,8 +59,9 @@ python -m bandit -q -r custom_components scripts
 - quality-scale status validation
 - translation structure validation
 - typed runtime-data baseline and strict mypy gate structure
-- an additional imported-HA type gate for runtime, read-only entry and device
-  metadata contracts, run against each matrix environment's actual HA types
+- an additional seven-file imported-HA type gate for runtime, reload, device
+  metadata and sensor/binary-sensor descriptions, run against each matrix
+  environment's actual HA types
 - icon/exception translation baseline
 - full integration unit/fixture test suite
 
@@ -72,10 +74,12 @@ reinstall solely for Marketplace. The user-facing procedures are in
 
 For each newly supported HA line, use the required Python version and compatible
 HA test helpers. Run `python -m pip check` and inspect pytest's skip summary as
-well as the exit code. Without `pytest-homeassistant-custom-component`, this
+well as the exit code. Without a matching Home Assistant test plugin, this
 repository intentionally skips the HA-backed tests; that helper-only run cannot
-establish HA compatibility or satisfy the release coverage gate. The compatibility
-work still outstanding for November is tracked in [lts.md](lts.md).
+establish HA compatibility or satisfy the release coverage gate. November uses
+the official Core test package pinned to the HA release commit; the minimum line
+uses its matching legacy custom-component helper. Remaining live Marketplace
+validation is tracked in [lts.md](lts.md).
 
 Before declaring Marketplace runtime compatibility, verify on a separate test HA:
 
@@ -130,11 +134,17 @@ merging, verify the release contains the reviewed content and no additional
 changes; changed content requires fresh review before publication. A clean review
 does not grant permission to merge, tag or publish without explicit approval.
 
-The HA `2026.10.4` maintenance release has a separate
-[v0.9.0 checklist](release_0.9.0.md). HA `2026.11` and Marketplace lifecycle
-validation are follow-up gates for claiming that compatibility, not prerequisites
-for this release on the tested HA baseline. Do not treat beta smoke tests as proof
-of stable HA or Marketplace compatibility.
+The [v0.9.0b1 checklist](release_0.9.0b1.md) requires the full suite on stable HA
+`2026.11.0` and the `2024.8.0` minimum. Live Marketplace lifecycle validation remains
+separate. Do not treat beta smoke tests or automated catalog metadata checks as
+proof of live installation/update/removal behavior.
+
+Beta/RC tags use canonical `X.Y.ZbN` / `X.Y.ZrcN` manifest versions and GitHub
+prerelease publication, with `make_latest: false`. They require the same final-head
+review and validation as stable releases. A reviewed beta may be tagged from its
+release branch without merging into `main`; the stable release channel stays
+unchanged. Post-publication verification checks the release channel as well as
+the tag, notes and ZIP.
 
 Release publication also runs `scripts/check_repo.py` before building the ZIP and
 `scripts/check_release_zip.py` before uploading the release asset. It also runs

@@ -8,6 +8,8 @@ from pathlib import Path
 import sys
 import types
 
+import pytest
+
 
 def _load_sensor_module():
     root = Path(__file__).resolve().parents[1]
@@ -586,6 +588,7 @@ def test_sensor_setup_adds_new_drive_entities_for_existing_pool() -> None:
     assert {
         f"device-1_pool_a_disk_b_{description.key}"
         for description in sensor_module.DRIVE_SENSOR_TYPES
+        if not description.requires_value
     } <= added_unique_ids
     assert not any("_pool_a_pool_status" in uid for uid in added_unique_ids)
 
@@ -661,6 +664,7 @@ def test_sensor_setup_adds_new_global_drive_entities_for_single_pool_expansion()
     assert {
         f"device-1_pool_a_disk_6_{description.key}"
         for description in sensor_module.DRIVE_SENSOR_TYPES
+        if not description.requires_value
     } <= added_unique_ids
 
 
@@ -2385,6 +2389,55 @@ def test_drive_like_filter_keeps_identity_only_raid_members() -> None:
     drives = sensor_module._collect_drive_like_dicts(payload["raidGroups"])
 
     assert drives == [{"serial": "SLOT2", "poolId": "pool-1", "slotId": "2"}]
+
+
+@pytest.mark.parametrize("progress,expected", [
+    (0, 0), (0.5, 0.5), (1, 1), (25, 25), (100, 100), ("42.5", 42.5),
+    (-1, None), (101, None), (True, None), ({}, None), ([], None),
+    ("invalid", None), (float("nan"), None), (float("inf"), None),
+])
+def test_raid_group_progress_is_bounded_percent_not_a_guessed_fraction(progress, expected):
+    pool = {"raidGroups": [{"progress": progress}]}
+    assert sensor_module._pool_rebuild_progress(pool) == expected
+
+
+def test_raid_progress_uses_slowest_active_data_group_and_preserves_direct_field():
+    pool = {"raidGroups": [
+        {"progress": 0}, {"progress": 100}, {"progress": 35}, {"progress": 80},
+        {"progress": 1, "isSSDCache": True}, "invalid",
+    ]}
+    assert sensor_module._pool_rebuild_progress(pool) == 35
+    assert sensor_module._pool_in_maintenance(pool)
+    pool["rebuildProgress"] = 60
+    assert sensor_module._pool_rebuild_progress(pool) == 60
+    pool = {"raidGroups": [{"status": "rebuilding"}, {"progress": 80}]}
+    assert sensor_module._pool_rebuild_progress(pool) is None
+    assert sensor_module._pool_in_maintenance(pool)
+
+
+@pytest.mark.parametrize("scrub,active", [
+    ({"status": "running", "progress": 0}, True),
+    ({"status": "running"}, True),
+    ({"progress": 40}, True),
+    ({"status": "idle", "progress": 40}, False),
+    ({"status": "completed", "progress": 100}, False),
+    ({"status": "failed", "progress": 40}, False),
+    ({"status": "unknown"}, False), ({}, False), (None, False),
+])
+def test_scrubbing_is_maintenance_not_sync_or_rebuild(scrub, active):
+    pool = {"dataScrubbing": scrub}
+    assert sensor_module._pool_in_maintenance(pool) is active
+    assert sensor_module._pool_sync_progress(pool) is None
+    assert sensor_module._pool_rebuild_progress(pool) is None
+
+
+def test_idle_raid_group_ignores_stale_progress_and_cache_only_is_not_data_maintenance():
+    pool = {"raidGroups": [{"status": "fullyOperational", "progress": 30}]}
+    assert sensor_module._pool_rebuild_progress(pool) == 0
+    assert not sensor_module._pool_in_maintenance(pool)
+    pool = {"raidGroups": [{"progress": 50, "isSSDCache": True}]}
+    assert sensor_module._pool_rebuild_progress(pool) is None
+    assert not sensor_module._pool_in_maintenance(pool)
 
 
 def test_system_metadata_helpers_extract_unifi_os_values() -> None:

@@ -18,10 +18,15 @@ from custom_components.unifi_unas.api import (
     UnsupportedFeature,
 )
 from custom_components.unifi_unas.const import (
+    DRIVE_DEVICE_INFO_PATH,
     FAN_CONTROL_PATH,
     NETWORK_IO_PATH,
     POWEROFF_PATH,
     REBOOT_PATH,
+)
+from custom_components.unifi_unas.system_metadata import (
+    drive_version,
+    unifi_os_version,
 )
 
 
@@ -377,6 +382,190 @@ def test_storage_read_tolerates_missing_system_metadata() -> None:
 
     assert data == {"storage": True}
     assert client._system_info is None
+
+
+@pytest.mark.parametrize("error", [
+    CannotConnect("HTTP 404"), InvalidAuth("permission denied"),
+    UnexpectedResponse("invalid JSON"), TimeoutError(),
+])
+def test_api_key_device_info_failure_is_optional_and_recovers(error):
+    """Missing Drive metadata must neither fail storage nor trigger login loops."""
+    client = _client(username="", password="", api_key="synthetic-key")
+    calls = []
+    failure = True
+
+    async def request(method, path):
+        calls.append(path)
+        if path == DRIVE_DEVICE_INFO_PATH:
+            if failure:
+                raise error
+            return {"firmwareVersion": "5.1.10", "version": "4.3.6"}
+        if path == "/api/system":
+            raise InvalidAuth("restricted")
+        return {"pools": []} if path.endswith("/storage") else {}
+
+    client._request_json = request
+
+    async def exercise():
+        nonlocal failure
+        data = await client.async_get_storage()
+        assert data == {"pools": [], "_network_io": {}}
+        failure = False
+        recovered = await client.async_get_storage()
+        assert unifi_os_version(recovered) == "5.1.10"
+        assert drive_version(recovered) == "4.3.6"
+        assert client._system_info is None  # Do not change trusted identity hints.
+
+    asyncio.run(exercise())
+    assert calls.count(DRIVE_DEVICE_INFO_PATH) == 2
+    assert not any("login" in path for path in calls)
+
+
+def test_device_info_timeout_does_not_hold_storage_and_recovers(monkeypatch):
+    """The extra API-key request has its own bounded lifetime."""
+    monkeypatch.setattr(api_storage_module, "_METADATA_REQUEST_TIMEOUT", 0.01)
+    client = _client(username="", password="", api_key="synthetic-key")
+    slow = True
+
+    async def request(method, path):
+        if path == DRIVE_DEVICE_INFO_PATH:
+            if slow:
+                await asyncio.Event().wait()
+            return {"version": "4.3.6"}
+        return {"pools": []} if path.endswith("/storage") else {}
+
+    client._request_json = request
+
+    async def exercise():
+        nonlocal slow
+        result = await asyncio.wait_for(client.async_get_storage(), 1)
+        assert result["pools"] == []
+        assert "_device_info" not in result
+        slow = False
+        assert "_device_info" in await client.async_get_storage()
+
+    asyncio.run(exercise())
+
+
+def test_static_api_key_metadata_cache_reduces_requests_and_expires(monkeypatch):
+    """Twenty 30-second polls read static core data once, live data twenty times."""
+    from collections import Counter
+
+    client = _client(username="", password="", api_key="synthetic-key")
+    clock = [0.0]
+    monkeypatch.setattr(api_storage_module, "monotonic", lambda: clock[0])
+    calls = Counter()
+    offline = False
+
+    async def request(method, path):
+        calls[path] += 1
+        if offline and path.endswith("/storage"):
+            raise CannotConnect("offline")
+        return {"hardware": {"firmwareVersion": "5.1.10"}} if path == "/api/system" else {}
+
+    client._request_json = request
+
+    async def exercise():
+        nonlocal offline
+        for poll in range(20):
+            clock[0] = poll * 30
+            assert (await client.async_get_storage())["_system"]["hardware"]["firmwareVersion"] == "5.1.10"
+        assert calls["/api/system"] == 1
+        assert calls[NETWORK_IO_PATH] == calls[DRIVE_DEVICE_INFO_PATH] == 20
+        assert sum(calls.values()) == 61  # Previously 80 requests, same live cadence.
+        clock[0] = 600
+        await client.async_get_storage()
+        assert calls["/api/system"] == 2
+        client.invalidate_system_metadata()
+        await client.async_get_storage()
+        assert calls["/api/system"] == 3
+        offline = True
+        with pytest.raises(CannotConnect):
+            await client.async_get_storage()
+        assert client._system_metadata_cached_at is None
+        offline = False
+        await client.async_get_storage()
+        assert calls["/api/system"] == 4
+
+    asyncio.run(exercise())
+
+
+@pytest.mark.parametrize("payload", [
+    {"cpu": {"temperature": 40}}, {"uptime": 20}, {"status": "online"},
+    {"apps": []}, {"hardware": {"temperature": 30}}, {"unknown": True}, {},
+])
+def test_dynamic_or_unrecognized_core_payloads_are_never_cached(payload):
+    client = _client(username="", password="", api_key="synthetic-key")
+    calls = []
+
+    async def request(method, path):
+        calls.append(path)
+        return payload if path == "/api/system" else {}
+
+    client._request_json = request
+
+    async def exercise():
+        for _ in range(3):
+            await client.async_get_storage()
+        assert calls.count("/api/system") == 3
+        assert client._system_metadata_cached_at is None
+
+    asyncio.run(exercise())
+
+
+def test_metadata_requests_overlap_and_cancel_without_orphan_tasks():
+    client = _client(username="", password="", api_key="synthetic-key")
+    active = set()
+
+    async def exercise():
+        all_started = asyncio.Event()
+
+        async def request(method, path):
+            if path.endswith("/storage"):
+                return {}
+            active.add(path)
+            if len(active) == 3:
+                all_started.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                active.remove(path)
+
+        client._request_json = request
+        task = asyncio.create_task(client.async_get_storage())
+        try:
+            await asyncio.wait_for(all_started.wait(), 1)
+        finally:
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+        assert not active
+
+    asyncio.run(exercise())
+
+
+def test_explicit_invalidation_during_metadata_read_is_not_lost():
+    client = _client(username="", password="", api_key="synthetic-key")
+
+    async def exercise():
+        started, finish = asyncio.Event(), asyncio.Event()
+
+        async def request(method, path):
+            started.set()
+            await finish.wait()
+            return {"firmwareVersion": "5.1.10"}
+
+        client._request_json = request
+        task = asyncio.create_task(client._read_system_metadata())
+        await started.wait()
+        client.invalidate_system_metadata()
+        finish.set()
+        await task
+        assert client._system_metadata_cached_at is None
+        await client._read_system_metadata()
+        assert client._system_metadata_cached_at is not None
+
+    asyncio.run(exercise())
 
 
 @pytest.mark.parametrize("slow_paths", [

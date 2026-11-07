@@ -1,0 +1,103 @@
+name: Hardware compatibility report
+description: Share working or failing monitoring results for a model and storage layout.
+title: "[Hardware]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Positive and negative results help improve the compatibility matrix for memphi2/ha-unifi-drive.
+        Read the [hardware reporting guide](https://github.com/memphi2/ha-unifi-drive/blob/main/docs/hardware_validation.md) first. Do not change pools, remove disks, shut down the NAS or run write controls for this report.
+        Never paste raw API payloads, credentials, hostnames, addresses, serials, WWNs, usernames or share names.
+
+  - type: dropdown
+    id: device_model
+    attributes:
+      label: UNAS model
+      options:
+        - UNAS2
+        - UNAS4
+        - UNAS Pro
+        - UNAS Pro4
+        - UNAS Pro8
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: input
+    id: versions
+    attributes:
+      label: Software versions
+      description: Include Home Assistant, this integration, UniFi OS and Drive versions. For a development build include its commit SHA and say whether local changes were present.
+      placeholder: "Home Assistant ..., integration ..., UniFi OS ..., Drive ..."
+    validations:
+      required: true
+
+  - type: input
+    id: observation_date
+    attributes:
+      label: Observation date
+      placeholder: "YYYY-MM-DD"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: auth_method
+    attributes:
+      label: Authentication method
+      options:
+        - Username and password
+        - API key
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: permissions
+    attributes:
+      label: Account role / permissions
+      description: Permission level only, never a username, password or API key.
+      placeholder: "Administrator / limited local user / unknown"
+    validations:
+      required: true
+
+  - type: textarea
+    id: storage_layout
+    attributes:
+      label: Storage layout
+      description: Number of populated data bays, pools, disks per pool and cache SSDs. Include HDD/SSD and NVMe/SATA types if known, not names or identifiers.
+      placeholder: "8 data HDDs, 2 pools of 4 disks, 2 NVMe cache SSDs"
+    validations:
+      required: true
+
+  - type: textarea
+    id: results
+    attributes:
+      label: Results compared with the device UI
+      description: For each area say working, failing or not tested. Include missing or duplicate entities and mismatched readings without private identifiers.
+      placeholder: |
+        Device model and versions:
+        Pool counts, capacity and health:
+        Data-disk assignment and temperatures:
+        Cache and optional SMART readings:
+        Throughput:
+        Entity counts after several polls:
+        Integration reload (optional):
+        Other observations / not tested:
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Reviewed diagnostics (optional)
+      description: Attach this integration's Home Assistant diagnostics after inspecting them locally. Do not attach raw API responses or device exports.
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Before submitting
+      options:
+        - label: These observations are from memphi2/ha-unifi-drive, not another integration.
+          required: true
+        - label: I marked untested areas and reviewed all text and attachments for private data.
+          required: true

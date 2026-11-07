@@ -1,6 +1,34 @@
 # Changelog
 
-## v0.9.0 - Runtime safety and quality validation
+## v0.9.0b1 - Storage diagnostics and runtime hardening (Beta 1)
+
+This is an opt-in prerelease. The stable release channel remains unchanged.
+
+- Validates stable HA `2026.11.0` with official test helpers from its immutable
+  Core revision and Python `3.14`, retaining HA `2024.8.0` / Python `3.12` coverage.
+- Uses HA 2026.11's `None`/exception setup/unload contract without changing the
+  legacy boolean behavior or clearing runtime state when platform unload fails.
+- Updates CodeQL `4.39.3`, Checkout `7.0.1`, Setup Python `7.1.0`, Release Action
+  `3.0.4`, Hassfest's pinned revision and Ruff `0.17.4`; security checks remain enabled.
+- Adds API-key device metadata fallbacks for firmware, Drive version, CPU
+  temperature and sampled uptime without introducing new entities for those values.
+- Adds firmware-reported SSD-cache, remaining-life and sector-error diagnostics.
+  These entities are disabled by default to avoid unwanted Recorder history.
+- Handles RAID-group progress and scrubbing metadata while keeping cache groups
+  separate from data-pool maintenance state.
+- Runs independent metadata reads concurrently and caches static system metadata
+  for up to ten minutes. Failed connections and explicit refreshes invalidate it.
+- Covers multi-pool layouts with four, seven and eight data disks plus two cache
+  SSDs, stable entity identities, offline recovery and privacy-safe diagnostics.
+  These are synthetic tests, not confirmed Pro/Pro4/Pro8 hardware support.
+- Adds a hardware compatibility report form and separates live, community,
+  captured-fixture and synthetic evidence in the compatibility matrix.
+- Expands the imported-HA type gate to seven boundary modules and removes
+  redundant config-flow wrappers without changing existing entry compatibility.
+- Publishes beta/RC versions as GitHub prereleases, never as the latest stable
+  release, with matching metadata and artifact verification.
+
+Also includes the unreleased 0.9.0 reliability work:
 
 - Limits decompressed HTTP response bodies to 8 MiB across monitoring, login,
   errors and local actions, with chunked/compressed response and recovery tests.
