@@ -61,7 +61,7 @@ async def test_aborted_feature_form_leaves_no_entry_and_can_restart(hass):
 @pytest.mark.parametrize("source", ["reauth", "reconfigure"])
 async def test_identity_rejection_preserves_entry_then_valid_retry(hass, source):
     from homeassistant.setup import async_setup_component
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from tests.ha_test_compat import MockConfigEntry
     from custom_components.unifi_unas.const import DOMAIN
     from tests.test_core_monitoring_entity_states import _MonitoringClient
 
@@ -117,7 +117,7 @@ async def test_identity_rejection_preserves_entry_then_valid_retry(hass, source)
 
 async def test_permission_repair_deduplication_recovery_and_entry_isolation(hass):
     from homeassistant.helpers import issue_registry as ir
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from tests.ha_test_compat import MockConfigEntry
     from custom_components.unifi_unas import snapshot_repairs as repairs
     from custom_components.unifi_unas.api_errors import InvalidAuth
     from custom_components.unifi_unas.const import DOMAIN

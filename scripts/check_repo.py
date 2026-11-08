@@ -24,6 +24,7 @@ from repo_hygiene import (  # noqa: E402
     fail,
     ok,
 )
+from release_version import validate_version  # noqa: E402
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -188,8 +189,9 @@ VALIDATE_WORKFLOW_HA_REQUIREMENT_PATTERN = re.compile(
 VALIDATE_WORKFLOW_PYTHON_PATTERN = re.compile(r"python:\s*[\"']?3\.14[\"']?")
 VALIDATE_WORKFLOW_MINIMUM_PYTHON_PATTERN = re.compile(r"python:\s*[\"']?3\.12[\"']?")
 RELEASE_WORKFLOW_PYTHON_PATTERN = re.compile(r"python-version:\s*[\"']?3\.14[\"']?")
-CURRENT_HOMEASSISTANT_TARGET = "2026.10.4"
-CURRENT_PYTEST_HOMEASSISTANT = "0.13.375"
+CURRENT_HOMEASSISTANT_TARGET = "2026.11.0"
+CURRENT_PYTEST_HOMEASSISTANT = "core"
+CURRENT_HA_HELPER_COMMIT = "74cf5a49c63ed8d4d87717844bf14f79c28c9cea"
 WORKFLOW_HOMEASSISTANT_MATRIX_PATTERN = re.compile(
     r"homeassistant:\s*[\"']([^\"']+)[\"']"
 )
@@ -461,9 +463,11 @@ def check_entity_name_rule() -> None:
 def _manifest_version_tag(manifest: dict[str, Any]) -> str:
     """Return the release tag expected for the manifest version."""
     version = manifest.get("version")
-    if not isinstance(version, str) or not version.strip():
-        fail("manifest.json version must be a non-empty string")
-    return version if version.startswith("v") else f"v{version}"
+    try:
+        validate_version(version)
+    except ValueError:
+        fail("manifest.json version must be canonical X.Y.Z, X.Y.ZbN or X.Y.ZrcN")
+    return f"v{version}"
 
 
 def _has_changelog_release_entry(changelog: str, version_tag: str) -> bool:
@@ -864,10 +868,13 @@ def check_validate_workflow_homeassistant_target() -> None:
     if '"0.13.152"' not in workflow_text:
         missing.append("pytest-homeassistant-custom-component 0.13.152")
     if f'"{CURRENT_PYTEST_HOMEASSISTANT}"' not in workflow_text:
-        missing.append(
-            "pytest-homeassistant-custom-component "
-            f"{CURRENT_PYTEST_HOMEASSISTANT}"
-        )
+        missing.append("official Home Assistant core test helpers")
+    if f'helper_commit: "{CURRENT_HA_HELPER_COMMIT}"' not in workflow_text:
+        missing.append("immutable matching core test-helper commit")
+    if "pytest-homeassistant @ git+https://github.com/home-assistant/core.git@${HA_HELPER_COMMIT}#subdirectory=packages/pytest-homeassistant" not in workflow_text:
+        missing.append("official core test-helper installation")
+    if 'helper.get("vcs_info", {}).get("commit_id") != commit' not in workflow_text:
+        missing.append("installed official test-helper provenance assertion")
     if not VALIDATE_WORKFLOW_HA_REQUIREMENT_PATTERN.search(workflow_text):
         missing.append('"homeassistant==${{ matrix.homeassistant }}"')
     if "package_constraints.txt" not in workflow_text:
@@ -913,6 +920,9 @@ def check_release_validation_gate() -> None:
         "    if: startsWith(github.ref, 'refs/tags/v')",
         "Verify release tag matches manifest",
         'if os.environ["RELEASE_TAG"] != expected:',
+        "from scripts.release_version import is_prerelease, validate_version",
+        "prerelease: ${{ steps.release_metadata.outputs.prerelease }}",
+        "make_latest: ${{ steps.release_metadata.outputs.make_latest }}",
     ):
         if marker not in release_text:
             fail(f"Release workflow missing validation gate: {marker}")
@@ -1140,8 +1150,13 @@ def check_imported_ha_typing_gate() -> None:
         if parser.get("mypy", key, fallback="").strip().lower() != expected:
             fail(f"mypy-ha.ini must set {key} = {expected}")
     files = {item.strip() for item in parser.get("mypy", "files", fallback="").split(",")}
-    if not {"scripts/typecheck_ha_contract.py", "custom_components/unifi_unas/device.py"} <= files:
-        fail("Imported HA typing gate must include the contract and device metadata builder")
+    required_files = {"scripts/typecheck_ha_contract.py"} | {
+        f"custom_components/unifi_unas/{name}.py"
+        for name in ("device", "runtime", "entity_base", "entry_reload",
+                     "sensor_descriptions", "binary_sensor_descriptions")
+    }
+    if not required_files <= files:
+        fail("Imported HA typing gate must include runtime, reload and entity metadata contracts")
     for name in files:
         ensure_file(ROOT / name)
     if "mypy --config-file mypy-ha.ini" not in VALIDATE_WORKFLOW_PATH.read_text(encoding="utf-8"):

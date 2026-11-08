@@ -28,14 +28,11 @@ from .config_flow_identity import (
 from .config_flow_schema import (
     FlowInputError,
     _connection_schema,
-    _connection_schema_fields as _connection_schema_fields_impl,
-    _feature_schema_fields as _feature_schema_fields_impl,
     _feature_schema,
     _merge_feature_defaults,
     _merged_reauth_data,
     _merged_reconfigure_data,
     _normalize_user_input as _normalize_user_input_impl,
-    _normalize_host_input as _normalize_host_input_impl,
 )
 from .config_flow_validation import (
     FlowValidator,
@@ -151,23 +148,6 @@ def _normalize_user_input(user_input: FlowFormInput) -> FlowFormInput:
         mac_normalizer=normalize_mac_address,
         broadcast_validator=validate_ipv4_address,
     )
-
-
-def _connection_schema_fields(
-    defaults: FlowFormInput | None = None,
-) -> dict[Any, Any]:
-    """Compatibility wrapper for config-flow schema tests."""
-    return _connection_schema_fields_impl(defaults)
-
-
-def _feature_schema_fields(defaults: FlowFormInput | None = None) -> dict[Any, Any]:
-    """Compatibility wrapper for config-flow schema tests."""
-    return _feature_schema_fields_impl(defaults)
-
-
-def _normalize_host_input(host_input: str) -> tuple[str, int | None, bool | None]:
-    """Compatibility wrapper for host normalization tests."""
-    return _normalize_host_input_impl(host_input)
 
 
 async def _async_validate_for_form(

@@ -8,7 +8,6 @@ from unittest.mock import patch
 import pytest
 
 from tests.ha_test_helpers import (
-    ROOT,
     ensure_repo_custom_components_path as _ensure_repo_custom_components_path,
 )
 
@@ -31,12 +30,6 @@ except (ImportError, AttributeError):
     CONF_SSL = "ssl"
     CONF_USERNAME = "username"
     CONF_VERIFY_SSL = "verify_ssl"
-
-
-@pytest.fixture
-def hass_config_dir() -> str:
-    """Point Home Assistant at this repository's test config directory."""
-    return str(ROOT)
 
 
 def _entry_data(
@@ -91,7 +84,7 @@ def _snapshot_target_with_controls() -> dict[str, Any]:
 async def _async_setup_entry_with_snapshot_controls(hass, client):
     """Patch network calls and initialize the integration for snapshot controls."""
     from homeassistant.setup import async_setup_component
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from tests.ha_test_compat import MockConfigEntry
 
     from custom_components.unifi_unas.const import DOMAIN
     _ensure_repo_custom_components_path()
@@ -187,11 +180,15 @@ class _SnapshotIntegrationClient:
     poweroff_permission_hint = None
 
     def __init__(self, targets: list[dict[str, Any]]) -> None:
+        self.metadata_invalidations = 0
         self.snapshot_settings = list(targets)
         self.updated: list[tuple[str, dict[str, Any]]] = []
         self.created: list[dict[str, Any]] = []
         self.inventory_requests: list[str] = []
         self.fail_next: Exception | None = None
+
+    def invalidate_system_metadata(self) -> None:
+        self.metadata_invalidations += 1
 
     async def _maybe_fail(self) -> None:
         if self.fail_next is not None:

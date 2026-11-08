@@ -63,6 +63,38 @@ async def test_idle_refreshes_do_not_write_states(recorder_mock, hass):
     assert await hass.config_entries.async_unload(entry.entry_id)
 
 
+@pytest.mark.parametrize("enabled", [False, True])
+async def test_cache_diagnostics_record_only_when_enabled(recorder_mock, hass, monkeypatch, enabled):
+    from dataclasses import replace
+    from homeassistant.helpers import entity_registry as er
+    from custom_components.unifi_unas import entities
+
+    if enabled:
+        monkeypatch.setattr(entities, "DRIVE_SENSOR_TYPES", tuple(
+            replace(description, entity_registry_enabled_default=True)
+            if description.key == "drive_remaining_life" else description
+            for description in entities.DRIVE_SENSOR_TYPES
+        ))
+    client, entry = await setup_monitoring(hass)
+    client.storage["cacheSlots"] = [{"id": "cache-a", "lifeSpan": 99}]
+    await refresh(hass, entry)
+    entries = er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
+    entity = next(item for item in entries if ":cache:" in item.unique_id)
+    before, attributes_before = await counts(hass, recorder_mock)
+    for value in range(98, 88, -1):
+        client.storage["cacheSlots"][0]["lifeSpan"] = value
+        await refresh(hass, entry)
+    after, attributes_after = await counts(hass, recorder_mock)
+    if enabled:
+        assert after[entity.entity_id] - before[entity.entity_id] == 10
+    else:
+        assert entity.disabled_by is er.RegistryEntryDisabler.INTEGRATION
+        assert after == before
+        assert entity.entity_id not in after
+    assert attributes_after == attributes_before  # No duplicated SMART attributes.
+    assert await hass.config_entries.async_unload(entry.entry_id)
+
+
 @pytest.mark.parametrize("recorder_config", [[], [
     "sensor.unas_read_throughput", "sensor.unas_write_throughput",
 ]], indirect=True, ids=["full", "lean"])

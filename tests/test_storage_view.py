@@ -3,6 +3,48 @@
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
+
+from tests.storage_fixtures import multi_pool_storage
+
+
+@pytest.mark.parametrize("drive_count", [4, 7, 8])
+@pytest.mark.parametrize("nested", [False, True], ids=["global", "pool-local"])
+def test_multi_pool_layout_keeps_data_and_cache_identity_separate(drive_count, nested):
+    """Exercise invented layouts without treating them as real-model fixtures."""
+    from custom_components.unifi_unas import storage_view as module
+
+    payload = multi_pool_storage(drive_count, nested=nested)
+    coordinator = SimpleNamespace(data=payload)
+    with patch.object(module, "_pool_drives", wraps=module._pool_drives) as normalize:
+        view = module.storage_view(coordinator)
+        for _ in range(10):
+            for index, pool in enumerate(view.pools):
+                members = view.drives(pool)
+                assert {disk["id"] for disk in members} == {
+                    f"disk-{slot}" for slot in range(index, drive_count, 2)
+                }
+                assert all(disk["poolId"] == pool["id"] for disk in members)
+        assert normalize.call_count == 2
+        assert len(view._drives) == 2
+        assert set(view.cache_drives) == {"id_disk_0", "id_disk_1"}
+        assert sum(len(view.drives(pool)) for pool in view.pools) == drive_count
+
+
+def test_multi_pool_layout_does_not_guess_membership_for_extra_global_disks():
+    """Spare, unassigned, empty and foreign-pool disks cannot fill another pool."""
+    from custom_components.unifi_unas.storage_view import StorageView
+
+    payload = multi_pool_storage()
+    payload["disks"].extend([
+        {"id": "spare", "isHotSpare": True},
+        {"id": "unassigned", "temperature": 32},
+        {"slotId": 9, "state": "empty"},
+        {"id": "foreign", "poolId": "another-pool", "temperature": 32},
+    ])
+    view = StorageView(payload)
+    assert [len(view.drives(pool)) for pool in view.pools] == [4, 4]
+
 
 def test_storage_view_reuses_normalization_and_preserves_legacy_lookup():
     from custom_components.unifi_unas import storage_view as module

@@ -32,6 +32,7 @@ NETWORK_CONTAINER_KEYS = (
     "wans",
     "lans",
     "interfaces",
+    "networkInterfaces",
     "networks",
     "ports",
 )

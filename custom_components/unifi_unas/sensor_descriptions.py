@@ -53,6 +53,12 @@ from .storage_helpers import (
     _write_throughput_mb_s,
 )
 
+from .storage_drives import (
+    _drive_bad_sectors,
+    _drive_remaining_life,
+    _drive_uncorrectable_sectors,
+)
+
 _PERCENTAGE_UNIT = "%"
 
 
@@ -310,9 +316,33 @@ class DriveSensorDescription(SensorEntityDescription):  # type: ignore[misc]
     value_fn: Callable[[dict[str, Any]], StateType]
     entity_category: EntityCategory | None = EntityCategory.DIAGNOSTIC
     entity_registry_enabled_default: bool = False
+    requires_value: bool = False
 
 
 DRIVE_SENSOR_TYPES: tuple[DriveSensorDescription, ...] = (
+    DriveSensorDescription(
+        key="drive_remaining_life",
+        translation_key="drive_remaining_life",
+        native_unit_of_measurement=_PERCENTAGE_UNIT,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        requires_value=True,
+        value_fn=_drive_remaining_life,
+    ),
+    DriveSensorDescription(
+        key="drive_bad_sectors",
+        translation_key="drive_bad_sectors",
+        state_class=SensorStateClass.MEASUREMENT,
+        requires_value=True,
+        value_fn=_drive_bad_sectors,
+    ),
+    DriveSensorDescription(
+        key="drive_uncorrectable_sectors",
+        translation_key="drive_uncorrectable_sectors",
+        state_class=SensorStateClass.MEASUREMENT,
+        requires_value=True,
+        value_fn=_drive_uncorrectable_sectors,
+    ),
     DriveSensorDescription(
         key="drive_status",
         translation_key="drive_status",

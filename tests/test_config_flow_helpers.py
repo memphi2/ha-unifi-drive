@@ -154,8 +154,8 @@ def test_config_flow_translations_cover_all_form_fields() -> None:
         package_root / "translations" / "en.json",
         package_root / "translations" / "de.json",
     )
-    connection_fields = set(config_flow_module._connection_schema_fields())
-    feature_fields = set(config_flow_module._feature_schema_fields())
+    connection_fields = set(config_flow_schema_module._connection_schema_fields())
+    feature_fields = set(config_flow_schema_module._feature_schema_fields())
     discovery_fields = {config_flow_module.CONF_DISCOVERED_DEVICE}
     reauth_fields = {"username", "password", "api_key"}
 
@@ -2104,7 +2104,7 @@ def test_config_flow_does_not_call_reload_methods() -> None:
 
 def test_normalize_host_accepts_dns_names_urls_and_ports() -> None:
     """Host normalization should support DNS names, URLs and host:port input."""
-    normalize = config_flow_module._normalize_host_input
+    normalize = config_flow_schema_module._normalize_host_input
 
     assert normalize("unas.local") == ("unas.local", None, None)
     assert normalize("https://unas.example.lan:8443") == (
@@ -2118,7 +2118,7 @@ def test_normalize_host_accepts_dns_names_urls_and_ports() -> None:
 
 def test_normalize_host_accepts_ipv6_and_rejects_numeric_hostname() -> None:
     """IPv6 literals should be bracketed and numeric-only hostnames rejected."""
-    normalize = config_flow_module._normalize_host_input
+    normalize = config_flow_schema_module._normalize_host_input
 
     assert normalize("2001:db8::1") == ("[2001:db8::1]", None, None)
     assert normalize("[2001:db8::1]:443") == ("[2001:db8::1]", 443, None)

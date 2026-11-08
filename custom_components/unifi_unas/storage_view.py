@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .storage_drives import _pool_drives
+from .storage_drives import _cache_drive_key, _cache_drives, _pool_drives
 from .storage_pools import _pool_from_key, _pools
 
 
@@ -14,6 +14,10 @@ class StorageView:
     def __init__(self, data: dict[str, Any] | None) -> None:
         self.data = data
         self.pools = _pools(data)
+        self.cache_drives = {
+            key: drive for drive in _cache_drives(data)
+            if (key := _cache_drive_key(drive)) is not None
+        }
         self._drives: dict[int, list[dict[str, Any]]] = {}
 
     def pool(self, key: str) -> dict[str, Any] | None:

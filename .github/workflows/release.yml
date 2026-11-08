@@ -25,10 +25,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.14"
           check-latest: true
@@ -40,6 +40,7 @@ jobs:
         run: python scripts/audit_github_public_surfaces.py --repo "$GITHUB_REPOSITORY"
 
       - name: Verify release tag matches manifest
+        id: release_metadata
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
@@ -47,11 +48,16 @@ jobs:
           import json
           import os
           from pathlib import Path
+          from scripts.release_version import is_prerelease, validate_version
 
           manifest = json.loads(Path("custom_components/unifi_unas/manifest.json").read_text())
-          expected = f"v{manifest['version']}"
+          expected = f"v{validate_version(manifest['version'])}"
           if os.environ["RELEASE_TAG"] != expected:
               raise SystemExit(f"Release tag must be {expected}")
+          beta = is_prerelease(expected)
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              print(f"prerelease={'true' if beta else 'false'}", file=output)
+              print(f"make_latest={'false' if beta else 'true'}", file=output)
           PY
 
       - name: Run repository release preflight
@@ -71,7 +77,7 @@ jobs:
         run: python scripts/check_release_zip.py dist/unifi_unas.zip
 
       - name: Upload release ZIP artifact
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: unifi_unas_release_zip
           path: dist/unifi_unas.zip
@@ -87,11 +93,13 @@ jobs:
           echo "body_path=$notes" >> "$GITHUB_OUTPUT"
 
       - name: Publish GitHub release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           files: dist/unifi_unas.zip
           body_path: ${{ steps.release_notes.outputs.body_path }}
           generate_release_notes: false
+          prerelease: ${{ steps.release_metadata.outputs.prerelease }}
+          make_latest: ${{ steps.release_metadata.outputs.make_latest }}
 
       - name: Verify published tag, notes and installation artifact
         env:

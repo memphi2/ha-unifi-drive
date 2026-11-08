@@ -101,3 +101,37 @@ async def test_core_timeout_keeps_client_usable(aiohttp_server, socket_enabled):
         server.delays.clear()
         assert await client.async_get_storage()
         assert server.login_count == 1
+
+
+@pytest.mark.parametrize("core_status", [200, 401, 403])
+async def test_api_key_device_info_complements_restricted_core_metadata(
+    aiohttp_server, socket_enabled, core_status,
+):
+    from custom_components.unifi_unas.const import DRIVE_DEVICE_INFO_PATH, SYSTEM_PATH
+    from custom_components.unifi_unas.system_metadata import drive_version, unifi_os_version
+    from custom_components.unifi_unas.storage_system import _cpu_temperature, _system_ip, _system_uptime_hours
+
+    async with connected_client(aiohttp_server) as (server, client):
+        server.api_key = "synthetic-key"
+        client._api_key = server.api_key
+        client._use_api_key_auth = True
+        server.payloads[SYSTEM_PATH] = {"status": "online"}
+        if core_status != 200:
+            server.statuses[SYSTEM_PATH] = core_status
+        server.payloads[DRIVE_DEVICE_INFO_PATH] = {
+            "version": "4.3.6", "firmwareVersion": "5.1.10", "cpu": {"temperature": 42},
+            "startupTime": "2026-01-01T00:00:00Z",
+            "networkInterfaces": [{"ipAddress": "192.0.2.10"}],
+        }
+        data = await client.async_check_connection()
+        assert data["readThroughput"] == "12 MB/s"
+        assert unifi_os_version(data) == "5.1.10"
+        assert drive_version(data) == "4.3.6"
+        assert _cpu_temperature(data) == 42
+        assert _system_ip(data) == "192.0.2.10"
+        assert _system_uptime_hours(data) is not None
+        assert server.login_count == 0
+        server.statuses[DRIVE_DEVICE_INFO_PATH] = 404
+        data = await client.async_get_storage()
+        assert "_device_info" not in data
+        assert data["readThroughput"] == "12 MB/s"

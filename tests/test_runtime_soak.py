@@ -15,7 +15,7 @@ async def test_repeated_runtime_resources(hass, monkeypatch, caplog):
     from aiohttp import ThreadedResolver
     from homeassistant.helpers import aiohttp_client
     from homeassistant.setup import async_setup_component
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from tests.ha_test_compat import MockConfigEntry
 
     from custom_components.unifi_unas.const import DOMAIN, CONF_SNAPSHOT_BUTTONS_ENABLED
     from custom_components.unifi_unas.api_errors import CannotConnect

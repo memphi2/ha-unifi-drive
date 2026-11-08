@@ -163,4 +163,4 @@ rules:
     comment: The local API client receives a Home Assistant-created aiohttp session.
   strict-typing:
     status: todo
-    comment: Every integration module is covered by strict mypy with an omission guard. A separate imported-HA gate checks runtime, entry and device metadata boundaries on both CI baselines without skipped imports. Any payload boundaries and base-class ignores remain elsewhere; complete imported-type correctness is not claimed.
+    comment: Every integration module is covered by strict mypy with an omission guard. A separate seven-file imported-HA gate checks runtime, reload, device metadata and sensor/binary-sensor descriptions on both CI baselines without skipped imports. Dynamic payload Any and primary-gate base-class ignores remain; complete imported-type correctness is not claimed.

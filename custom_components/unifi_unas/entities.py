@@ -33,15 +33,17 @@ from .snapshot_inventory import (
     SNAPSHOT_INVENTORY_STATUS_FALLBACK,
     SNAPSHOT_INVENTORY_STATUS_OK,
 )
-from .storage_helpers import (
+from .storage_drives import (
     _drive_key,
     _drive_name,
     _legacy_drive_index,
-    _normalized_token,
+    _raw_drive_health,
+)
+from .system_metadata import normalized_token as _normalized_token
+from .storage_pools import (
     _pool_key,
     _pool_name,
     _pools,
-    _raw_drive_health,
     _raw_pool_status,
 )
 
@@ -62,7 +64,8 @@ async def async_setup_entry(
     )
 
     known_pool_keys: set[str] = set()
-    known_drive_keys: set[str] = set()
+    known_drive_keys: set[tuple[str, str]] = set()
+    known_cache_keys: set[tuple[str, str]] = set()
 
     def _add_missing_pool_sensors() -> None:
         """Create pool sensors when pool data becomes available."""
@@ -84,12 +87,15 @@ async def async_setup_entry(
             for drive_index, drive in enumerate(view.drives(pool)):
                 drive_key = _drive_key(drive, drive_index)
                 full_drive_key = f"{pool_key}_{drive_key}"
-                if full_drive_key in known_drive_keys:
-                    continue
-                known_drive_keys.add(full_drive_key)
                 drive_name = _drive_name(drive, drive_index)
-                new_entities.extend(
-                    UnifiUnasDriveSensor(
+                for description in DRIVE_SENSOR_TYPES:
+                    key = (full_drive_key, description.key)
+                    if key in known_drive_keys or (
+                        description.requires_value and description.value_fn(drive) is None
+                    ):
+                        continue
+                    known_drive_keys.add(key)
+                    new_entities.append(UnifiUnasDriveSensor(
                         coordinator,
                         entry,
                         description,
@@ -97,9 +103,17 @@ async def async_setup_entry(
                         full_drive_key,
                         pool_name,
                         drive_name,
-                    )
-                    for description in DRIVE_SENSOR_TYPES
-                )
+                    ))
+
+        for index, (drive_key, drive) in enumerate(view.cache_drives.items()):
+            for description in DRIVE_SENSOR_TYPES:
+                key = (drive_key, description.key)
+                if key in known_cache_keys or description.value_fn(drive) is None:
+                    continue
+                known_cache_keys.add(key)
+                new_entities.append(UnifiUnasCacheDriveSensor(
+                    coordinator, entry, description, "", drive_key, "Cache", _drive_name(drive, index)
+                ))
 
         if new_entities:
             async_add_entities(new_entities)
@@ -317,6 +331,32 @@ class UnifiUnasDriveSensor(UnifiUnasBaseSensor):
                     return drive
 
         return None
+
+
+class UnifiUnasCacheDriveSensor(UnifiUnasDriveSensor):
+    """Cache-slot diagnostics with a namespace independent of data-pool IDs."""
+
+    def __init__(
+        self,
+        coordinator: UnifiUnasCoordinator,
+        entry: UnifiDriveConfigEntry,
+        description: DriveSensorDescription,
+        pool_key: str,
+        drive_key: str,
+        pool_name: str,
+        drive_name: str,
+    ) -> None:
+        super().__init__(coordinator, entry, description, pool_key, drive_key, pool_name, drive_name)
+        self._attr_unique_id = f"{self._device_identifier}:cache:{drive_key}:{description.key}"
+
+    def _drive(self) -> dict[str, Any] | None:
+        return storage_view(self.coordinator).cache_drives.get(self._drive_key)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        """No synthetic pool metadata or duplicated SMART values in Recorder."""
+        drive = self._drive()
+        return {"raw_health": _raw_drive_health(drive)} if drive is not None else None
 
 
 class UnifiUnasSnapshotInventorySensor(

@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: HACS validation
         uses: hacs/action@1ebf01c408f29afcb6406bd431bc98fd8cbb15aa # main
@@ -34,13 +34,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Hassfest validation
-        uses: home-assistant/actions/hassfest@50baf3a307f87100cf550d4ae127746595030d5d # master
+        uses: home-assistant/actions/hassfest@86d4564712fa02543c808e3a693dd04f9d3f8361 # master
 
   repository_checks:
-    name: Repository checks
+    name: Repository checks (${{ matrix.homeassistant }}, ${{ matrix.python }}, ${{ matrix.pytest_homeassistant }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -49,26 +49,34 @@ jobs:
           - homeassistant: "2024.8.0"
             python: "3.12"
             pytest_homeassistant: "0.13.152"
-          - homeassistant: "2026.10.4"
+          - homeassistant: "2026.11.0"
             python: "3.14"
-            pytest_homeassistant: "0.13.375"
+            pytest_homeassistant: "core"
+            helper_commit: "74cf5a49c63ed8d4d87717844bf14f79c28c9cea"
     steps:
       - name: Checkout
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Setup Python
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: ${{ matrix.python }}
           check-latest: true
 
       - name: Install test dependencies
+        env:
+          HA_HELPER_COMMIT: ${{ matrix.helper_commit }}
         run: |
+          if [ -n "$HA_HELPER_COMMIT" ]; then
+            helper="pytest-homeassistant @ git+https://github.com/home-assistant/core.git@${HA_HELPER_COMMIT}#subdirectory=packages/pytest-homeassistant"
+          else
+            helper="pytest-homeassistant-custom-component==${{ matrix.pytest_homeassistant }}"
+          fi
           python -m pip install \
             -c "https://raw.githubusercontent.com/home-assistant/core/${{ matrix.homeassistant }}/homeassistant/package_constraints.txt" \
             -r requirements/ci/requirements.txt \
             "homeassistant==${{ matrix.homeassistant }}" \
-            "pytest-homeassistant-custom-component==${{ matrix.pytest_homeassistant }}" \
+            "$helper" \
             "josepy<2.0; python_version < '3.13'"
           python -m pip check
 
@@ -76,16 +84,25 @@ jobs:
         run: |
           python - <<'PY'
           import os
+          import json
           import importlib.metadata as md
 
           expected = os.environ["EXPECTED_HOMEASSISTANT_VERSION"]
           version = md.version("homeassistant")
           if version != expected:
               raise SystemExit(f"Expected Home Assistant {expected}, got {version}")
+          if commit := os.environ.get("EXPECTED_HELPER_COMMIT"):
+              helper = json.loads(md.distribution("pytest-homeassistant").read_text("direct_url.json") or "{}")
+              if helper.get("vcs_info", {}).get("commit_id") != commit:
+                  raise SystemExit("Official HA test helpers must match the pinned core commit")
+          elif md.version("pytest-homeassistant-custom-component") != os.environ["EXPECTED_LEGACY_HELPER"]:
+              raise SystemExit("Legacy HA test helper version mismatch")
           print(f"Home Assistant test version: {version}")
           PY
         env:
           EXPECTED_HOMEASSISTANT_VERSION: ${{ matrix.homeassistant }}
+          EXPECTED_HELPER_COMMIT: ${{ matrix.helper_commit }}
+          EXPECTED_LEGACY_HELPER: ${{ matrix.pytest_homeassistant }}
 
       - name: Run repository checks
         env:
@@ -125,7 +142,7 @@ jobs:
 
       - name: Retain synthetic runtime evidence
         if: always() && matrix.python == '3.14' && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: synthetic-runtime-${{ github.sha }}
           path: ${{ runner.temp }}/unas-soak.json

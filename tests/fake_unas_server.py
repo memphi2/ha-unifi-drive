@@ -16,6 +16,7 @@ class FakeUnasServer:
         self.login_count = 0
         self.generation = 0
         self.reject_login = False
+        self.api_key = None
         self.statuses = {}
         self.delays = {}
         self.malformed = set()
@@ -49,7 +50,8 @@ class FakeUnasServer:
             response = web.json_response({"id": "synthetic-user"})
             response.set_cookie("TOKEN", f"synthetic-session-{self.generation}")
             return response
-        if request.cookies.get("TOKEN") != f"synthetic-session-{self.generation}":
+        key_authenticated = self.api_key is not None and request.headers.get("X-API-Key") == self.api_key
+        if not key_authenticated and request.cookies.get("TOKEN") != f"synthetic-session-{self.generation}":
             return web.Response(status=401)
         if status := self.statuses.get(request.path):
             return web.Response(status=status)

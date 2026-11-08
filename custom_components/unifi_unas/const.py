@@ -73,6 +73,7 @@ DEFAULT_WOL_PORT = 9
 LOGIN_PATH = "/api/auth/login"
 DRIVE_STORAGE_PATH = "/proxy/drive/api/v2/storage"
 NETWORK_IO_PATH = "/proxy/drive/api/v2/systems/network-io"
+DRIVE_DEVICE_INFO_PATH = "/proxy/drive/api/v2/systems/device-info"
 SYSTEM_PATH = "/api/system"
 UNIFI_OS_UPDATE_PATH = "/api/firmware/update"
 DRIVE_APPLICATION_UPDATE_PATH = "/api/applications/drive/update"

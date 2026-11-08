@@ -9,7 +9,6 @@ from unittest.mock import patch
 import pytest
 
 from tests.ha_test_helpers import (
-    ROOT,
     ensure_repo_custom_components_path as _ensure_repo_custom_components_path,
 )
 
@@ -31,12 +30,6 @@ except (ImportError, AttributeError):
     CONF_SSL = "ssl"
     CONF_USERNAME = "username"
     CONF_VERIFY_SSL = "verify_ssl"
-
-
-@pytest.fixture
-def hass_config_dir() -> str:
-    """Point Home Assistant at this repository's test config directory."""
-    return str(ROOT)
 
 
 def _entry_data(**overrides: Any) -> dict[str, Any]:
@@ -103,12 +96,16 @@ class _ControlIntegrationClient:
     snapshot_settings_read_supported = False
 
     def __init__(self) -> None:
+        self.metadata_invalidations = 0
         self.fan_modes: list[str] = []
         self.backup_runs: list[str] = []
         self.reboot_count = 0
         self.poweroff_count = 0
         self.fail_next: Exception | None = None
         self.backup_tasks = [{"id": "task-1", "name": "Nightly Backup"}]
+
+    def invalidate_system_metadata(self) -> None:
+        self.metadata_invalidations += 1
 
     async def _maybe_fail(self) -> None:
         if self.fail_next is not None:
@@ -163,7 +160,7 @@ async def test_backup_task_name_is_translated(hass, language, suffix):
 async def _async_setup_control_entry(hass, client, **data_overrides: Any):
     """Patch network calls and initialize the integration."""
     from homeassistant.setup import async_setup_component
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from tests.ha_test_compat import MockConfigEntry
 
     from custom_components.unifi_unas.const import DOMAIN
 
@@ -228,6 +225,7 @@ async def test_fan_select_reports_and_updates_home_assistant_state(hass) -> None
     await hass.async_block_till_done()
 
     assert client.fan_modes == ["Cooling"]
+    assert client.metadata_invalidations == 1
     assert hass.states.get(entity_id).state == "Cooling"
 
 

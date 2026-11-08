@@ -42,11 +42,16 @@ def test_ci_tool_manifest_contains_only_direct_stable_pins() -> None:
         for raw_line in TOOLS_PATH.read_text().splitlines()
         if (line := raw_line.strip()) and not line.startswith("#")
     ]
-    assert len(requirements) == 3
-    assert {requirement.name for requirement in requirements} == {"bandit", "mypy", "ruff"}
+    assert len(requirements) == 4
+    assert {requirement.name for requirement in requirements} == {"bandit", "mypy", "ruff", "coverage"}
     for requirement in requirements:
         assert not requirement.extras
-        assert requirement.marker is None
+        if requirement.name == "coverage":
+            assert requirement.marker is not None
+            assert requirement.marker.evaluate({"python_version": "3.14"})
+            assert not requirement.marker.evaluate({"python_version": "3.12"})
+        else:
+            assert requirement.marker is None
         assert requirement.url is None
         specifiers = list(requirement.specifier)
         assert len(specifiers) == 1

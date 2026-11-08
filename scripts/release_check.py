@@ -15,8 +15,10 @@ from zipfile import ZIP_DEFLATED, BadZipFile, ZipFile
 
 try:
     from scripts.check_release_zip import check_release_zip
+    from scripts.release_version import is_prerelease, validate_version
 except ModuleNotFoundError:
     from check_release_zip import check_release_zip
+    from release_version import is_prerelease, validate_version
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPONENT = "custom_components/unifi_unas/"
@@ -71,8 +73,12 @@ def verify_archive(path: Path, expected: dict[str, bytes]) -> None:
 
 
 def verify_release_metadata(release: dict, tag: str, notes: str) -> None:
-    if release.get("tag_name") != tag or release.get("draft") or release.get("prerelease"):
-        raise ValueError("published release tag or stable-release status is incorrect")
+    if (
+        release.get("tag_name") != tag
+        or release.get("draft") is not False
+        or release.get("prerelease") is not is_prerelease(tag)
+    ):
+        raise ValueError("published release tag, draft status or release channel is incorrect")
     if (release.get("body") or "").replace("\r\n", "\n").strip() != notes.strip():
         raise ValueError("published release notes differ from the approved commit")
     assets = release.get("assets", [])
@@ -106,9 +112,7 @@ def main(argv: list[str] | None = None) -> int:
         commit = run(["git", "rev-parse", "--verify", "--end-of-options", f"{args.ref}^{{commit}}"])
         sha = commit.decode().strip()
         files = source_files(sha)
-        version = json.loads(files["unifi_unas/manifest.json"])["version"]
-        if not isinstance(version, str) or not re.fullmatch(r"\d+\.\d+\.\d+", version):
-            raise ValueError("expected a stable semantic version")
+        version = validate_version(json.loads(files["unifi_unas/manifest.json"])["version"])
         tag = f"v{version}"
         notes = run(["git", "show", f"{sha}:.github/release-notes/{tag}.md"]).decode()
         changelog = run(["git", "show", f"{sha}:CHANGELOG.md"]).decode()
@@ -121,6 +125,10 @@ def main(argv: list[str] | None = None) -> int:
                     raise ValueError("remote tag differs from the approved commit")
                 release = json.loads(run(["gh", "api", f"repos/{args.repo}/releases/tags/{tag}"]))
                 verify_release_metadata(release, tag, notes)
+                if is_prerelease(tag):
+                    latest = json.loads(run(["gh", "api", f"repos/{args.repo}/releases/latest"]))
+                    if latest.get("tag_name") == tag or latest.get("prerelease") is not False:
+                        raise ValueError("prerelease must not replace the latest stable release")
                 run(["gh", "release", "download", tag, "--repo", args.repo,
                      "--pattern", "unifi_unas.zip", "--dir", directory])
             else:

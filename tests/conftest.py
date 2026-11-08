@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
-from importlib.util import find_spec
 from types import ModuleType
 import sys
 
 import pytest
+from tests.ha_test_helpers import ha_test_plugin_available
+
+
+@pytest.fixture
+def hass_config_dir(tmp_path) -> str:
+    """Isolate writable HA storage across tests and baseline versions."""
+    return str(tmp_path)
 
 HA_BACKED_TEST_FILES = {
     "test_flow_manager_paths.py",
@@ -43,7 +49,7 @@ def _prepare_ha_integration_namespace(request: pytest.FixtureRequest) -> None:
     """Make every HA-backed file independently runnable after stub cleanup."""
     if request.node.path.name not in HA_BACKED_TEST_FILES:
         return
-    if find_spec("pytest_homeassistant_custom_component") is None:
+    if not ha_test_plugin_available():
         return
     if request.node.path.name == "test_recorder_runtime.py":
         request.getfixturevalue("recorder_db_url")
@@ -68,11 +74,11 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
 
 def _skip_ha_backed_tests_without_plugin(items: list[pytest.Item]) -> None:
     """Skip HA-backed tests when the Home Assistant pytest plugin is unavailable."""
-    if find_spec("pytest_homeassistant_custom_component") is not None:
+    if ha_test_plugin_available():
         return
 
     skip = pytest.mark.skip(
-        reason="HA-backed tests require pytest-homeassistant-custom-component"
+        reason="HA-backed tests require the matching Home Assistant test plugin"
     )
     for item in items:
         if item.path.name in HA_BACKED_TEST_FILES:
@@ -81,7 +87,7 @@ def _skip_ha_backed_tests_without_plugin(items: list[pytest.Item]) -> None:
 
 def _remove_collection_stubs() -> None:
     """Clear stub modules that were installed only to import pure helpers."""
-    if find_spec("pytest_homeassistant_custom_component") is None:
+    if not ha_test_plugin_available():
         return
 
     for name, module in list(sys.modules.items()):

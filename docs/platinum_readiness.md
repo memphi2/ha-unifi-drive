@@ -24,7 +24,7 @@ Home Assistant tier.
 | config-flow-test-coverage | Complete HA-driven tests of every setup, options, reauth and reconfigure branch. Helper coverage alone is insufficient. |
 | entity-unavailable | Monitoring intentionally retains last-known readings while Device online reports offline. This does not fully satisfy HA's sensor availability rule. Keep WOL usable and resolve this as an explicit compatibility decision. |
 | test-coverage | CI enforces 95% aggregate line coverage. HA requires more than 95% per module; close the gaps with behavior tests, not exclusions. |
-| strict-typing | All integration modules are in the strict mypy scope, guarded against omissions. A second gate follows imported HA types for runtime, entry and device metadata contracts. Remaining work is narrowing Any payload/HA boundaries elsewhere; the main gate still uses follow_imports=skip and targeted base-class ignores. |
+| strict-typing | All integration modules are in the strict mypy scope, guarded against omissions. A second seven-file gate follows imported HA types for runtime, reload, device metadata and sensor/binary-sensor descriptions. Remaining work is narrowing Any payload/HA boundaries elsewhere; the main gate still uses follow_imports=skip and targeted base-class ignores. |
 
 Rule references: [flow coverage](https://contributors.home-assistant.io/core/quality-scale/config-flow-test-coverage/),
 [availability](https://contributors.home-assistant.io/core/quality-scale/entity-unavailable/),
@@ -67,9 +67,9 @@ Rule references: [flow coverage](https://contributors.home-assistant.io/core/qua
 ## Validation And Release
 
 [Validation](validation.md) defines the full local and CI gates, plus independent
-final-head Code Review. The [release checklist](release_0.9.0.md)
-targets the tested HA `2026.10.4` maintenance baseline and separately tracks
-November compatibility and Marketplace lifecycle follow-up checks. No live HA/NAS
+final-head Code Review. The [release checklist](release_0.9.0b1.md)
+targets stable HA `2026.11.0` and the `2024.8.0` minimum, and separately tracks
+Marketplace lifecycle follow-up checks. No live HA/NAS
 validation is implied by local synthetic tests.
 
 Historical evidence remains in the [v0.6.2 live report](live_test_report_v0.6.2.md)

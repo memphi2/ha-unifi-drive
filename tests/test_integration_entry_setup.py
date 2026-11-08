@@ -11,15 +11,8 @@ from weakref import ref
 import pytest
 
 from tests.ha_test_helpers import (
-    ROOT,
     ensure_repo_custom_components_path as _ensure_repo_custom_components_path,
 )
-
-
-@pytest.fixture
-def hass_config_dir() -> str:
-    """Point Home Assistant at this repository's test config directory."""
-    return str(ROOT)
 
 
 def _entry_data(*, wol_enabled: bool = False) -> dict[str, object]:
@@ -152,7 +145,7 @@ def test_entry_reload_signature_handles_mixed_nested_values() -> None:
 def test_backfills_discovery_mac_identity(hass) -> None:
     """Setup helpers should persist a MAC identity for existing entries."""
     _ensure_repo_custom_components_path()
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from tests.ha_test_compat import MockConfigEntry
 
     from custom_components.unifi_unas import _async_backfill_discovery_mac
     from custom_components.unifi_unas.const import CONF_DISCOVERY_MAC_ADDRESS, DOMAIN
@@ -172,7 +165,7 @@ def test_backfills_discovery_mac_identity(hass) -> None:
 def test_backfill_discovery_mac_keeps_existing_identity(hass) -> None:
     """Existing discovery MAC metadata should not be overwritten."""
     _ensure_repo_custom_components_path()
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from tests.ha_test_compat import MockConfigEntry
 
     from custom_components.unifi_unas import _async_backfill_discovery_mac
     from custom_components.unifi_unas.const import CONF_DISCOVERY_MAC_ADDRESS, DOMAIN
@@ -350,7 +343,7 @@ async def test_setup_and_unload_entry_stores_and_removes_coordinator(hass) -> No
     """Entry setup should store the coordinator and unload should remove it."""
     _ensure_repo_custom_components_path()
     from homeassistant.setup import async_setup_component
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from tests.ha_test_compat import MockConfigEntry
 
     from custom_components.unifi_unas.const import DOMAIN
 
@@ -403,7 +396,7 @@ async def test_repeated_entry_lifecycle_releases_sessions_entities_and_coordinat
     from aiohttp import ThreadedResolver
     from homeassistant.helpers import aiohttp_client
     from homeassistant.setup import async_setup_component
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from tests.ha_test_compat import MockConfigEntry
 
     from custom_components.unifi_unas.const import (
         DOMAIN, CONF_FAN_CONTROL_ENABLED, CONF_SNAPSHOT_BUTTONS_ENABLED,
@@ -458,7 +451,7 @@ async def test_setup_entry_cleans_runtime_when_platform_forwarding_fails(
 ) -> None:
     """A failed platform setup should not leave stale runtime objects."""
     _ensure_repo_custom_components_path()
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from tests.ha_test_compat import MockConfigEntry
 
     from custom_components.unifi_unas import async_setup_entry
     from custom_components.unifi_unas.const import DOMAIN
@@ -502,11 +495,73 @@ async def test_setup_entry_cleans_runtime_when_platform_forwarding_fails(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("modern", [False, True])
+@pytest.mark.parametrize("unloaded", [False, True])
+async def test_unload_contract_preserves_runtime_on_failure(hass, monkeypatch, modern, unloaded):
+    """Modern HA gets an exception on failure; the legacy bool contract remains."""
+    from types import SimpleNamespace
+    from homeassistant.exceptions import ConfigEntryError
+    from custom_components import unifi_unas as integration
+
+    entry = SimpleNamespace(runtime_data=object())
+    monkeypatch.setattr(integration, "_ENTRY_METHOD_RETURNS_NONE", modern)
+    with (
+        patch("homeassistant.config_entries.ConfigEntries.async_unload_platforms", new=AsyncMock(return_value=unloaded)),
+        patch.object(integration, "_async_clear_entry_runtime") as clear,
+    ):
+        if modern and not unloaded:
+            with pytest.raises(ConfigEntryError) as error:
+                await integration.async_unload_entry(hass, entry)
+            assert error.value.translation_key == "unload_platforms_failed"
+        else:
+            result = await integration.async_unload_entry(hass, entry)
+            assert result is (None if modern else unloaded)
+        if unloaded:
+            clear.assert_called_once_with(hass, entry)
+        else:
+            clear.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_entry_lifecycle_success_uses_running_ha_contract(hass):
+    """Real setup/unload succeeds with None on modern HA and True on older HA."""
+    from homeassistant.const import MAJOR_VERSION, MINOR_VERSION
+    from custom_components import unifi_unas as integration
+    from tests.test_core_monitoring_entity_states import _MonitoringClient, _async_setup_monitoring_entry
+
+    setup = integration.async_setup_entry
+    unload = integration.async_unload_entry
+    results = []
+
+    async def traced_setup(hass, entry):
+        result = await setup(hass, entry)
+        results.append(result)
+        return result
+
+    async def traced_unload(hass, entry):
+        result = await unload(hass, entry)
+        results.append(result)
+        return result
+
+    with (
+        patch.object(integration, "async_setup_entry", traced_setup),
+        patch.object(integration, "async_unload_entry", traced_unload),
+    ):
+        entry = await _async_setup_monitoring_entry(hass, _MonitoringClient())
+        assert await hass.config_entries.async_unload(entry.entry_id)
+        await hass.async_block_till_done()
+    assert len(results) == 2
+    expected = None if (MAJOR_VERSION, MINOR_VERSION) >= (2026, 11) else True
+    assert all(result is expected for result in results)
+    assert getattr(entry, "runtime_data", None) is None
+
+
+@pytest.mark.asyncio
 async def test_setup_entry_rejects_corrupted_entry_without_host(hass) -> None:
     """A damaged config entry should fail cleanly when the host is missing."""
     _ensure_repo_custom_components_path()
     from homeassistant.exceptions import ConfigEntryError
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from tests.ha_test_compat import MockConfigEntry
 
     from custom_components.unifi_unas import async_setup_entry
     from custom_components.unifi_unas.const import DOMAIN
@@ -580,7 +635,7 @@ def test_device_registry_metadata_sync_updates_firmware_version(hass) -> None:
     """Coordinator refreshes should keep HA device firmware metadata current."""
     _ensure_repo_custom_components_path()
     from homeassistant.helpers import device_registry as dr
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from tests.ha_test_compat import MockConfigEntry
 
     from custom_components.unifi_unas import _async_sync_device_registry_metadata
     from custom_components.unifi_unas.const import DOMAIN
@@ -634,7 +689,7 @@ def test_device_registry_metadata_sync_preserves_unset_fields(
     """Unset firmware/URL fields must not erase metadata or write the registry."""
     _ensure_repo_custom_components_path()
     from homeassistant.helpers import device_registry as dr
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from tests.ha_test_compat import MockConfigEntry
 
     from custom_components.unifi_unas import _async_sync_device_registry_metadata
     from custom_components.unifi_unas.const import DOMAIN
@@ -670,7 +725,7 @@ def test_device_registry_metadata_tracking_registers_refresh_listener(hass) -> N
     """Device metadata tracking should sync immediately and on coordinator updates."""
     _ensure_repo_custom_components_path()
     from homeassistant.helpers import device_registry as dr
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from tests.ha_test_compat import MockConfigEntry
 
     from custom_components.unifi_unas import _async_track_device_registry_metadata_updates
     from custom_components.unifi_unas.const import DOMAIN
@@ -728,7 +783,7 @@ async def test_setup_entry_allows_not_ready_when_wol_enabled(hass) -> None:
     _ensure_repo_custom_components_path()
     from homeassistant.exceptions import ConfigEntryNotReady
     from homeassistant.setup import async_setup_component
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from tests.ha_test_compat import MockConfigEntry
 
     from custom_components.unifi_unas.const import DOMAIN
 
@@ -768,7 +823,7 @@ async def test_setup_entry_reads_wol_fallback_from_options(hass) -> None:
     _ensure_repo_custom_components_path()
     from homeassistant.exceptions import ConfigEntryNotReady
     from homeassistant.setup import async_setup_component
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from tests.ha_test_compat import MockConfigEntry
 
     from custom_components.unifi_unas.const import (
         CONF_WOL_ENABLED,
@@ -816,7 +871,7 @@ async def test_setup_entry_raises_not_ready_when_wol_disabled(hass) -> None:
     _ensure_repo_custom_components_path()
     from homeassistant.exceptions import ConfigEntryNotReady
     from homeassistant.setup import async_setup_component
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from tests.ha_test_compat import MockConfigEntry
 
     from custom_components.unifi_unas.const import DOMAIN
 
@@ -855,7 +910,7 @@ async def test_removes_unsupported_snapshot_create_buttons(hass) -> None:
     """Setup should purge old create buttons for foreign personal targets."""
     _ensure_repo_custom_components_path()
     from homeassistant.helpers import entity_registry as er
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from tests.ha_test_compat import MockConfigEntry
 
     from custom_components.unifi_unas import (
         _async_remove_unsupported_snapshot_create_buttons,
@@ -985,7 +1040,7 @@ def test_remove_unsupported_snapshot_create_buttons_skips_invalid_entries(
     """Cleanup should ignore malformed snapshot entries without errors."""
     _ensure_repo_custom_components_path()
     from homeassistant.helpers import entity_registry as er
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from tests.ha_test_compat import MockConfigEntry
 
     from custom_components.unifi_unas import (
         _async_remove_unsupported_snapshot_create_buttons,
@@ -1041,7 +1096,7 @@ async def test_retries_unsupported_snapshot_create_button_cleanup_after_refresh(
     """Delayed snapshot discovery should still purge old unsupported buttons."""
     _ensure_repo_custom_components_path()
     from homeassistant.helpers import entity_registry as er
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
+    from tests.ha_test_compat import MockConfigEntry
 
     from custom_components.unifi_unas import (
         _async_track_unsupported_snapshot_create_button_cleanup,

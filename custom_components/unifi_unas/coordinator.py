@@ -126,6 +126,11 @@ class UnifiUnasCoordinator(DataUpdateCoordinator[dict[str, Any]]):  # type: igno
         finally:
             self._first_refresh_core_only = False
 
+    async def async_request_refresh(self) -> None:
+        """Explicit action refreshes must also update cached system metadata."""
+        self.client.invalidate_system_metadata()
+        await super().async_request_refresh()
+
     async def async_refresh_optional_features(self) -> None:
         """Refresh optional local endpoints after core entities exist."""
         if not isinstance(self.data, dict):
